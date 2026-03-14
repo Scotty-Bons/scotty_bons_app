@@ -20,6 +20,7 @@ export function UpdatePasswordForm({
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -27,6 +28,12 @@ export function UpdatePasswordForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     startTransition(async () => {
       const result = await updatePassword(password);
       if (result.error) {
@@ -56,6 +63,17 @@ export function UpdatePasswordForm({
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="confirm">Confirm new password</Label>
+                <Input
+                  id="confirm"
+                  type="password"
+                  placeholder="Confirm new password"
+                  required
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
                 />
               </div>
               {error && (
