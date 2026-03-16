@@ -279,6 +279,12 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      create_order_with_items: {
+        Args: {
+          p_items: Json
+        }
+        Returns: string
+      }
       order_belongs_to_store: {
         Args: {
           p_order_id: string

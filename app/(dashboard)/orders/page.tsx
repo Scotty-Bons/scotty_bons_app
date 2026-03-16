@@ -6,23 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/utils";
+import { STATUS_COLORS, STATUS_LABELS } from "@/lib/constants/order-status";
 import type { OrderStatus } from "@/lib/types";
-
-const STATUS_COLORS: Record<OrderStatus, string> = {
-  submitted: "bg-gray-500 text-white",
-  under_review: "bg-amber-500 text-white",
-  approved: "bg-green-600 text-white",
-  declined: "bg-red-600 text-white",
-  fulfilled: "bg-blue-600 text-white",
-};
-
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  submitted: "Submitted",
-  under_review: "Under Review",
-  approved: "Approved",
-  declined: "Declined",
-  fulfilled: "Fulfilled",
-};
 
 export default async function OrdersPage() {
   const supabase = await createClient();
@@ -38,7 +23,9 @@ export default async function OrdersPage() {
     .eq("user_id", user.id)
     .single();
 
-  const role = profile?.role ?? "store";
+  if (!profile) redirect("/login");
+
+  const role = profile.role;
   const isStore = role === "store";
 
   // Fetch orders — RLS handles store_id filtering for store users,
@@ -69,6 +56,22 @@ export default async function OrdersPage() {
     }
   }
 
+  // For admin/factory roles, fetch store names to display on each order
+  const storeNames: Record<string, string> = {};
+  if (!isStore && orders.length > 0) {
+    const storeIds = [...new Set(orders.map((o) => o.store_id))];
+    const { data: stores } = await supabase
+      .from("stores")
+      .select("id, name")
+      .in("id", storeIds);
+
+    if (stores) {
+      for (const store of stores) {
+        storeNames[store.id] = store.name;
+      }
+    }
+  }
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -95,7 +98,7 @@ export default async function OrdersPage() {
             </p>
             {isStore && (
               <Button asChild>
-                <Link href="/orders/new">Create your first order</Link>
+                <Link href="/orders/new">New Order</Link>
               </Button>
             )}
           </CardContent>
@@ -105,10 +108,12 @@ export default async function OrdersPage() {
           {orders.map((order) => {
             const status = order.status as OrderStatus;
             const summary = itemSummaries[order.id];
+            const storeName = storeNames[order.store_id];
             return (
-              <div
+              <Link
                 key={order.id}
-                className="flex items-center justify-between gap-4 px-4 py-3"
+                href={`/orders/${order.id}`}
+                className="flex items-center justify-between gap-4 px-4 py-3 border-l-4 border-primary hover:bg-muted/50 transition-colors"
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium">
@@ -122,6 +127,7 @@ export default async function OrdersPage() {
                     {summary
                       ? ` · ${summary.count} ${summary.count === 1 ? "item" : "items"}`
                       : ""}
+                    {storeName ? ` · ${storeName}` : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
@@ -134,7 +140,7 @@ export default async function OrdersPage() {
                     {STATUS_LABELS[status]}
                   </Badge>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

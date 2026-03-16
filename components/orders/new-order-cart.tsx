@@ -235,15 +235,18 @@ export function NewOrderCart({ categories, products, storeId }: NewOrderCartProp
                         type="number"
                         min={1}
                         value={item.quantity}
-                        onChange={(e) =>
-                          dispatch({
-                            type: "UPDATE_QUANTITY",
-                            payload: {
-                              product_id: item.product_id,
-                              quantity: parseInt(e.target.value, 10) || 0,
-                            },
-                          })
-                        }
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          if (!Number.isNaN(val)) {
+                            dispatch({
+                              type: "UPDATE_QUANTITY",
+                              payload: {
+                                product_id: item.product_id,
+                                quantity: Math.max(1, val),
+                              },
+                            });
+                          }
+                        }}
                         className="w-16 text-center h-8"
                       />
                       <Button
