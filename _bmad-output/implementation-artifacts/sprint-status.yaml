@@ -69,8 +69,8 @@ development_status:
   # Epic 3: Order Management — Core Lifecycle
   epic-3: in-progress
   3-1-store-user-create-and-submit-supply-order: done
-  3-2-store-user-view-own-order-history-and-details: review
-  3-3-admin-view-all-orders-with-real-time-updates: backlog
+  3-2-store-user-view-own-order-history-and-details: done
+  3-3-admin-view-all-orders-with-real-time-updates: done
   3-4-admin-approve-decline-and-place-order-under-review: backlog
   3-5-admin-edit-and-delete-orders: backlog
   3-6-factory-user-view-approved-orders-and-mark-as-fulfilled: backlog

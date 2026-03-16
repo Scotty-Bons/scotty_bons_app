@@ -56,6 +56,28 @@ export default async function OrderDetailPage({
     .eq("order_id", orderId)
     .order("changed_at", { ascending: true });
 
+  // For admin/factory: fetch submitter name and store name
+  const isAdmin = profile.role === "admin" || profile.role === "factory";
+  let submitterName: string | null = null;
+  let storeName: string | null = null;
+
+  if (isAdmin) {
+    const [{ data: submitter }, { data: store }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("user_id", order.submitted_by)
+        .single(),
+      supabase
+        .from("stores")
+        .select("name")
+        .eq("id", order.store_id)
+        .single(),
+    ]);
+    submitterName = submitter?.full_name ?? null;
+    storeName = store?.name ?? null;
+  }
+
   const orderItems = items ?? [];
   const statusHistory = history ?? [];
   const status = order.status as OrderStatus;
@@ -116,6 +138,18 @@ export default async function OrderDetailPage({
               <dt className="text-muted-foreground">Total</dt>
               <dd className="font-medium text-lg">{formatPrice(orderTotal)}</dd>
             </div>
+            {storeName && (
+              <div>
+                <dt className="text-muted-foreground">Store</dt>
+                <dd className="font-medium">{storeName}</dd>
+              </div>
+            )}
+            {submitterName && (
+              <div>
+                <dt className="text-muted-foreground">Submitted by</dt>
+                <dd className="font-medium">{submitterName}</dd>
+              </div>
+            )}
           </dl>
         </CardContent>
       </Card>

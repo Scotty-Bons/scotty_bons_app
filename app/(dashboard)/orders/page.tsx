@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/utils";
 import { STATUS_COLORS, STATUS_LABELS } from "@/lib/constants/order-status";
 import type { OrderStatus } from "@/lib/types";
+import { RealtimeOrderList } from "@/components/orders/realtime-order-list";
 
 export default async function OrdersPage() {
   const supabase = await createClient();
@@ -104,46 +105,56 @@ export default async function OrdersPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="rounded-md border divide-y">
-          {orders.map((order) => {
-            const status = order.status as OrderStatus;
-            const summary = itemSummaries[order.id];
-            const storeName = storeNames[order.store_id];
-            return (
-              <Link
-                key={order.id}
-                href={`/orders/${order.id}`}
-                className="flex items-center justify-between gap-4 px-4 py-3 border-l-4 border-primary hover:bg-muted/50 transition-colors"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">
-                    Order {order.id.slice(0, 8)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Intl.DateTimeFormat("en-CA", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    }).format(new Date(order.created_at))}
-                    {summary
-                      ? ` · ${summary.count} ${summary.count === 1 ? "item" : "items"}`
-                      : ""}
-                    {storeName ? ` · ${storeName}` : ""}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  {summary && (
-                    <span className="text-sm font-medium">
-                      {formatPrice(summary.total)}
-                    </span>
-                  )}
-                  <Badge className={STATUS_COLORS[status]}>
-                    {STATUS_LABELS[status]}
-                  </Badge>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+        (() => {
+          const orderListContent = (
+            <div className="rounded-md border divide-y">
+              {orders.map((order) => {
+                const status = order.status as OrderStatus;
+                const summary = itemSummaries[order.id];
+                const storeName = storeNames[order.store_id];
+                return (
+                  <Link
+                    key={order.id}
+                    href={`/orders/${order.id}`}
+                    className="flex items-center justify-between gap-4 px-4 py-3 border-l-4 border-primary hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">
+                        Order {order.id.slice(0, 8)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Intl.DateTimeFormat("en-CA", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        }).format(new Date(order.created_at))}
+                        {summary
+                          ? ` · ${summary.count} ${summary.count === 1 ? "item" : "items"}`
+                          : ""}
+                        {storeName ? ` · ${storeName}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      {summary && (
+                        <span className="text-sm font-medium">
+                          {formatPrice(summary.total)}
+                        </span>
+                      )}
+                      <Badge className={STATUS_COLORS[status]}>
+                        {STATUS_LABELS[status]}
+                      </Badge>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          );
+
+          return role === "admin" || role === "factory" ? (
+            <RealtimeOrderList>{orderListContent}</RealtimeOrderList>
+          ) : (
+            orderListContent
+          );
+        })()
       )}
     </div>
   );

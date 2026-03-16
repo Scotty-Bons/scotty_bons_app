@@ -1,6 +1,6 @@
 # Story 3.2: Store User — View Own Order History & Details
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -334,15 +334,34 @@ No issues encountered during implementation.
 - `npm run build` — zero errors, route `/orders/[order-id]` confirmed dynamic
 - `npm run lint` — zero errors/warnings
 
+**Out-of-scope Story 3-1 fixes applied during this story (should have been a separate commit):**
+- Created `create_order_with_items` RPC migration — atomic server-side order creation with price lookup (fixes client-trusted prices security issue and non-atomic inserts from Story 3-1)
+- Rewrote `orders/actions.ts` to call RPC instead of 2-step client-side insert
+- Updated `database.types.ts` with new RPC function signature
+- Fixed quantity input handling in `new-order-cart.tsx` (NaN guard + min 1 enforcement)
+- Fixed null profile bug in orders list page: `profile?.role ?? "store"` silently defaulted to store role on null profile — replaced with proper null check + redirect
+
+**Code review fixes (2026-03-16):**
+- Updated `lib/validations/orders.ts` to match RPC contract: removed stale `store_id`, `product_name`, `unit_of_measure`, `unit_price` fields (RPC only needs `product_id` + `quantity`)
+- Updated `new-order-cart.tsx` to remove unused `storeId` prop and only send `product_id` + `quantity` to `createOrder()`
+- Updated `orders/new/page.tsx` to remove `storeId` prop from `<NewOrderCart>`
+
 ### File List
 
 **New files:**
 - `scotty-ops/lib/constants/order-status.ts` — Shared STATUS_COLORS and STATUS_LABELS constants
 - `scotty-ops/app/(dashboard)/orders/[order-id]/page.tsx` — Order detail page (Server Component)
+- `scotty-ops/supabase/migrations/20260317110000_create_order_rpc.sql` — Atomic order creation RPC (Story 3-1 fix)
 
 **Modified files:**
-- `scotty-ops/app/(dashboard)/orders/page.tsx` — Added Link wrapping, orange border, store name for admin/factory, imported shared constants
+- `scotty-ops/app/(dashboard)/orders/page.tsx` — Added Link wrapping, orange border, store name for admin/factory, imported shared constants, fixed null profile bug
+- `scotty-ops/app/(dashboard)/orders/actions.ts` — Rewritten to use `create_order_with_items` RPC (Story 3-1 fix)
+- `scotty-ops/app/(dashboard)/orders/new/page.tsx` — Removed unused `storeId` prop (code review fix)
+- `scotty-ops/components/orders/new-order-cart.tsx` — Fixed quantity input NaN handling, removed `storeId` prop, sends only `product_id` + `quantity` to action (code review fix)
+- `scotty-ops/lib/types/database.types.ts` — Added `create_order_with_items` function signature (Story 3-1 fix)
+- `scotty-ops/lib/validations/orders.ts` — Aligned schema with RPC contract: items only require `product_id` + `quantity` (code review fix)
 
 ### Change Log
 
 - 2026-03-16: Story 3-2 implemented — order list enhanced with clickable rows and orange border; order detail page created with items table, status history timeline, decline reason callout, and breadcrumb navigation
+- 2026-03-16: Code review — fixed stale validation schema (removed `store_id`, `product_name`, `unit_of_measure`, `unit_price`), removed unused `storeId` prop from cart component and parent page, documented 4 undocumented files and Story 3-1 out-of-scope fixes
