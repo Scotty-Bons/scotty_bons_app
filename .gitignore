@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# legacy submodule directory (kept locally for node_modules/env)
+/scotty-ops/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
