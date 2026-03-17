@@ -15,3 +15,5 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
   declined: "Declined",
   fulfilled: "Fulfilled",
 };
+
+export const TERMINAL_STATUSES: OrderStatus[] = ["approved", "declined", "fulfilled"];

@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatPrice } from "@/lib/utils";
 import { STATUS_COLORS, STATUS_LABELS } from "@/lib/constants/order-status";
 import type { OrderStatus } from "@/lib/types";
+import { OrderStatusActions } from "@/components/orders/order-status-actions";
+import { DeleteOrderButton } from "@/components/orders/delete-order-button";
 
 export default async function OrderDetailPage({
   params,
@@ -115,7 +117,19 @@ export default async function OrderDetailPage({
       {/* Order header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Order #{order.id.slice(0, 8)}</h1>
-        <Badge className={STATUS_COLORS[status]}>{STATUS_LABELS[status]}</Badge>
+        <div className="flex items-center gap-3">
+          <Badge className={STATUS_COLORS[status]}>{STATUS_LABELS[status]}</Badge>
+          <OrderStatusActions
+            orderId={order.id}
+            currentStatus={status}
+            role={profile.role}
+          />
+          <DeleteOrderButton
+            orderId={order.id}
+            currentStatus={status}
+            role={profile.role}
+          />
+        </div>
       </div>
 
       {/* Order metadata */}

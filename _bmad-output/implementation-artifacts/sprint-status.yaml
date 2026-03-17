@@ -50,7 +50,7 @@ development_status:
   epic-0-retrospective: optional
 
   # Epic 1: Authentication & User Management
-  epic-1: in-progress
+  epic-1: done
   1-1-user-login: done
   1-2-password-reset-via-email: done
   1-3-change-password-and-email: done
@@ -71,8 +71,8 @@ development_status:
   3-1-store-user-create-and-submit-supply-order: done
   3-2-store-user-view-own-order-history-and-details: done
   3-3-admin-view-all-orders-with-real-time-updates: done
-  3-4-admin-approve-decline-and-place-order-under-review: backlog
-  3-5-admin-edit-and-delete-orders: backlog
+  3-4-admin-approve-decline-and-place-order-under-review: review
+  3-5-admin-edit-and-delete-orders: review
   3-6-factory-user-view-approved-orders-and-mark-as-fulfilled: backlog
   epic-3-retrospective: optional
 
