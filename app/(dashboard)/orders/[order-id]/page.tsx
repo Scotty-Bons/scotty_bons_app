@@ -9,6 +9,7 @@ import { STATUS_COLORS, STATUS_LABELS } from "@/lib/constants/order-status";
 import type { OrderStatus } from "@/lib/types";
 import { OrderStatusActions } from "@/components/orders/order-status-actions";
 import { DeleteOrderButton } from "@/components/orders/delete-order-button";
+import { FulfillOrderButton } from "@/components/orders/fulfill-order-button";
 
 export default async function OrderDetailPage({
   params,
@@ -129,6 +130,11 @@ export default async function OrderDetailPage({
             currentStatus={status}
             role={profile.role}
           />
+          <FulfillOrderButton
+            orderId={order.id}
+            currentStatus={status}
+            role={profile.role}
+          />
         </div>
       </div>
 
@@ -162,6 +168,12 @@ export default async function OrderDetailPage({
               <div>
                 <dt className="text-muted-foreground">Submitted by</dt>
                 <dd className="font-medium">{submitterName}</dd>
+              </div>
+            )}
+            {order.fulfilled_at && (
+              <div>
+                <dt className="text-muted-foreground">Fulfilled</dt>
+                <dd className="font-medium">{formatDate(order.fulfilled_at)}</dd>
               </div>
             )}
           </dl>

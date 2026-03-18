@@ -67,13 +67,13 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: Order Management — Core Lifecycle
-  epic-3: in-progress
+  epic-3: done
   3-1-store-user-create-and-submit-supply-order: done
   3-2-store-user-view-own-order-history-and-details: done
   3-3-admin-view-all-orders-with-real-time-updates: done
-  3-4-admin-approve-decline-and-place-order-under-review: review
-  3-5-admin-edit-and-delete-orders: review
-  3-6-factory-user-view-approved-orders-and-mark-as-fulfilled: backlog
+  3-4-admin-approve-decline-and-place-order-under-review: done
+  3-5-admin-edit-and-delete-orders: done
+  3-6-factory-user-view-approved-orders-and-mark-as-fulfilled: done
   epic-3-retrospective: optional
 
   # ── Sprint 2 — Post-MVP ─────────────────────────────────────────────────────

@@ -113,12 +113,62 @@ export async function deleteOrder(
     .from("orders")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", orderId)
-    .not("status", "in", "(approved,declined,fulfilled)")
+    .not("status", "in", `(${TERMINAL_STATUSES.join(",")})`)
     .select("id")
     .single();
 
   if (error || !data) {
     return { data: null, error: "Order not found or cannot be deleted." };
+  }
+
+  revalidatePath("/orders");
+  revalidatePath(`/orders/${orderId}`);
+  return { data: undefined, error: null };
+}
+
+export async function fulfillOrder(
+  orderId: string
+): Promise<ActionResult<void>> {
+  if (!UUID_REGEX.test(orderId)) {
+    return { data: null, error: "Invalid order ID." };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: "Unauthorized." };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!profile || profile.role !== "factory") {
+    return { data: null, error: "Unauthorized." };
+  }
+
+  const { data: order } = await supabase
+    .from("orders")
+    .select("status")
+    .eq("id", orderId)
+    .single();
+
+  if (!order) return { data: null, error: "Order not found." };
+
+  if (order.status !== "approved") {
+    return { data: null, error: "Only approved orders can be fulfilled." };
+  }
+
+  const { error: updateError } = await supabase
+    .from("orders")
+    .update({ status: "fulfilled", fulfilled_at: new Date().toISOString() })
+    .eq("id", orderId);
+
+  if (updateError) {
+    return { data: null, error: "Failed to fulfill order. Please try again." };
   }
 
   revalidatePath("/orders");
