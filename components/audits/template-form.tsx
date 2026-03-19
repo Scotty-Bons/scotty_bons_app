@@ -14,7 +14,7 @@ import {
 
 interface TemplateFormProps {
   defaultValues?: CreateTemplateValues;
-  onSubmit: (values: CreateTemplateValues) => Promise<void>;
+  onSubmit: (values: CreateTemplateValues) => void | Promise<void>;
   onCancel: () => void;
 }
 

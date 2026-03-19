@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult, AuditTemplateRow } from "@/lib/types";
 import { z } from "zod";
@@ -72,6 +73,7 @@ export async function createTemplate(
     return { data: null, error: "Failed to create template items. Please try again." };
   }
 
+  revalidatePath("/audits/templates");
   return {
     data: {
       ...template,
@@ -136,6 +138,7 @@ export async function updateTemplate(
     return { data: null, error: "Failed to update template items. Please try again." };
   }
 
+  revalidatePath("/audits/templates");
   return { data: null, error: null };
 }
 
@@ -155,6 +158,7 @@ export async function toggleTemplateActive(
     .eq("id", templateId);
 
   if (error) return { data: null, error: "Failed to update template status." };
+  revalidatePath("/audits/templates");
   return { data: null, error: null };
 }
 
@@ -191,5 +195,6 @@ export async function deleteTemplate(
     .eq("id", templateId);
 
   if (error) return { data: null, error: "Failed to delete template. Please try again." };
+  revalidatePath("/audits/templates");
   return { data: null, error: null };
 }

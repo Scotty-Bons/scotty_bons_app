@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult, AuditEvidenceRow } from "@/lib/types";
 import { z } from "zod";
@@ -61,8 +62,13 @@ export async function uploadAuditEvidence(
     return { data: null, error: `Maximum ${MAX_EVIDENCE_PER_ITEM} photos per item.` };
   }
 
-  // Upload to storage
-  const ext = file.name.split(".").pop() ?? "jpg";
+  // Upload to storage — derive extension from validated MIME type, not user filename
+  const MIME_TO_EXT: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+  };
+  const ext = MIME_TO_EXT[file.type] ?? "jpg";
   const filePath = `${auditResponseId}/${crypto.randomUUID()}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
@@ -96,6 +102,7 @@ export async function uploadAuditEvidence(
     return { data: null, error: "Failed to save evidence. Please try again." };
   }
 
+  revalidatePath("/audits");
   return { data: data as AuditEvidenceRow, error: null };
 }
 
@@ -133,5 +140,6 @@ export async function removeAuditEvidence(
     .eq("id", evidenceId);
 
   if (error) return { data: null, error: "Failed to remove evidence." };
+  revalidatePath("/audits");
   return { data: null, error: null };
 }

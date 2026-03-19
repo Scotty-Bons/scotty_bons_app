@@ -107,6 +107,11 @@ DECLARE
   v_company_address text;
   v_company_tax_id text;
 BEGIN
+  -- Auth check: only factory or admin can fulfill
+  IF auth_role() NOT IN ('factory', 'admin') THEN
+    RAISE EXCEPTION 'Unauthorized.';
+  END IF;
+
   -- Fetch and validate order
   SELECT id, store_id, status INTO v_order FROM orders WHERE id = p_order_id;
   IF NOT FOUND THEN
@@ -116,21 +121,24 @@ BEGIN
     RAISE EXCEPTION 'Only approved orders can be fulfilled.';
   END IF;
 
-  -- Update order status to fulfilled
-  UPDATE orders
-    SET status = 'fulfilled', fulfilled_at = now(), updated_at = now()
-    WHERE id = p_order_id;
-
-  -- Check if invoice already exists for this order
+  -- Check if invoice already exists for this order (idempotency guard)
   IF EXISTS (SELECT 1 FROM invoices WHERE order_id = p_order_id) THEN
     SELECT id INTO v_invoice_id FROM invoices WHERE order_id = p_order_id;
     RETURN v_invoice_id;
   END IF;
 
+  -- Update order status to fulfilled (with optimistic lock on status)
+  UPDATE orders
+    SET status = 'fulfilled', fulfilled_at = now(), updated_at = now()
+    WHERE id = p_order_id AND status = 'approved';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Order status changed concurrently.';
+  END IF;
+
   -- Fetch financial_settings
   SELECT value INTO v_company_name FROM financial_settings WHERE key = 'company_name';
   SELECT value INTO v_company_address FROM financial_settings WHERE key = 'company_address';
-  SELECT value INTO v_company_tax_id FROM financial_settings WHERE key = 'company_phone';
+  SELECT value INTO v_company_tax_id FROM financial_settings WHERE key = 'company_email';
 
   v_company_name := COALESCE(v_company_name, '');
   v_company_address := COALESCE(v_company_address, '');
@@ -144,6 +152,9 @@ BEGIN
 
   -- Fetch store name
   SELECT name INTO v_store FROM stores WHERE id = v_order.store_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Store not found.';
+  END IF;
 
   -- Calculate subtotal from order items
   SELECT COALESCE(SUM(unit_price * quantity), 0) INTO v_subtotal

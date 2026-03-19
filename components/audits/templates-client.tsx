@@ -63,47 +63,53 @@ export function TemplatesClient({ templates, allItems }: TemplatesClientProps) {
     setDialogOpen(true);
   }
 
-  async function handleSubmit(values: CreateTemplateValues) {
-    if (editingTemplate) {
-      const result = await updateTemplate(editingTemplate.id, values);
+  function handleSubmit(values: CreateTemplateValues) {
+    startTransition(async () => {
+      if (editingTemplate) {
+        const result = await updateTemplate(editingTemplate.id, values);
+        if (result.error) {
+          toast.error(result.error);
+          return;
+        }
+        toast.success("Template updated successfully.");
+      } else {
+        const result = await createTemplate(values);
+        if (result.error) {
+          toast.error(result.error);
+          return;
+        }
+        toast.success("Template created successfully.");
+      }
+      setDialogOpen(false);
+      router.refresh();
+    });
+  }
+
+  function handleToggle(template: AuditTemplateRow, checked: boolean) {
+    startTransition(async () => {
+      const result = await toggleTemplateActive(template.id, checked);
       if (result.error) {
         toast.error(result.error);
         return;
       }
-      toast.success("Template updated successfully.");
-    } else {
-      const result = await createTemplate(values);
-      if (result.error) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success("Template created successfully.");
-    }
-    setDialogOpen(false);
-    startTransition(() => router.refresh());
+      toast.success(checked ? "Template activated." : "Template deactivated.");
+      router.refresh();
+    });
   }
 
-  async function handleToggle(template: AuditTemplateRow, checked: boolean) {
-    const result = await toggleTemplateActive(template.id, checked);
-    if (result.error) {
-      toast.error(result.error);
-      return;
-    }
-    toast.success(checked ? "Template activated." : "Template deactivated.");
-    startTransition(() => router.refresh());
-  }
-
-  async function handleDelete() {
+  function handleDelete() {
     if (!deletingTemplate) return;
-    const result = await deleteTemplate(deletingTemplate.id);
-    if (result.error) {
-      toast.error(result.error);
+    startTransition(async () => {
+      const result = await deleteTemplate(deletingTemplate!.id);
+      if (result.error) {
+        toast.error(result.error);
+        setDeletingTemplate(null);
+        return;
+      }
+      toast.success("Template deleted.");
       setDeletingTemplate(null);
-      return;
-    }
-    toast.success("Template deleted.");
-    setDeletingTemplate(null);
-    startTransition(() => router.refresh());
+      router.refresh();
+    });
   }
 
   return (

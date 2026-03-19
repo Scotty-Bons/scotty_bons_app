@@ -156,9 +156,17 @@ export async function fulfillOrder(
   );
 
   if (rpcError) {
+    const knownMessages = [
+      "Only approved orders can be fulfilled.",
+      "Order not found.",
+      "Unauthorized.",
+      "Order status changed concurrently.",
+      "Store not found.",
+    ];
+    const msg = knownMessages.find((m) => rpcError.message?.includes(m));
     return {
       data: null,
-      error: rpcError.message || "Failed to fulfill order. Please try again.",
+      error: msg || "Failed to fulfill order. Please try again.",
     };
   }
 

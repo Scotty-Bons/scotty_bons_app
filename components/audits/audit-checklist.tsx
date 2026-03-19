@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useCallback } from "react";
+import { useRef, useState, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -48,6 +48,8 @@ export function AuditChecklist({
   }
 
   const [responses, setResponses] = useState<Record<string, ResponseState>>(initialResponses);
+  const responsesRef = useRef(responses);
+  responsesRef.current = responses;
   const [auditNotes, setAuditNotes] = useState("");
 
   // Build evidence map: response_id -> evidence[]
@@ -71,7 +73,7 @@ export function AuditChecklist({
         audit_id: auditId,
         template_item_id: itemId,
         passed,
-        notes: responses[itemId]?.notes || undefined,
+        notes: responsesRef.current[itemId]?.notes || undefined,
       });
 
       if (result.error) {
@@ -88,12 +90,12 @@ export function AuditChecklist({
         [itemId]: { ...prev[itemId], id: result.data?.id, saving: false },
       }));
     },
-    [auditId, responses]
+    [auditId],
   );
 
   const handleNotesBlur = useCallback(
     async (itemId: string) => {
-      const current = responses[itemId];
+      const current = responsesRef.current[itemId];
       if (!current || current.id === undefined) return;
 
       setResponses((prev) => ({
@@ -101,19 +103,23 @@ export function AuditChecklist({
         [itemId]: { ...prev[itemId], saving: true },
       }));
 
-      await saveAuditResponse({
+      const result = await saveAuditResponse({
         audit_id: auditId,
         template_item_id: itemId,
         passed: current.passed,
         notes: current.notes || undefined,
       });
 
+      if (result.error) {
+        toast.error(result.error);
+      }
+
       setResponses((prev) => ({
         ...prev,
         [itemId]: { ...prev[itemId], saving: false },
       }));
     },
-    [auditId, responses]
+    [auditId],
   );
 
   const handleComplete = useCallback(async () => {

@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/types";
 import {
@@ -56,6 +57,7 @@ export async function createAudit(
     return { data: null, error: "Failed to create audit. Please try again." };
   }
 
+  revalidatePath("/audits");
   return { data: { id: data.id }, error: null };
 }
 
@@ -156,11 +158,14 @@ export async function completeAudit(
       notes: parsed.data.notes ?? null,
       conducted_at: new Date().toISOString(),
     })
-    .eq("id", audit.id);
+    .eq("id", audit.id)
+    .eq("status", "draft");
 
   if (error) {
     return { data: null, error: "Failed to complete audit. Please try again." };
   }
 
+  revalidatePath("/audits");
+  revalidatePath(`/audits/${audit.id}`);
   return { data: { score }, error: null };
 }
