@@ -11,6 +11,7 @@ import {
   type SaveResponseValues,
   type CompleteAuditValues,
 } from "@/lib/validations/audits";
+import { notifyAuditCompleted } from "@/lib/email/audit-notifications";
 
 /** Verifies the current session belongs to an admin or commissary. Returns the supabase client and user id, or null. */
 async function verifyAdminOrCommissary() {
@@ -109,7 +110,7 @@ export async function completeAudit(
   // Fetch audit to get template_id
   const { data: audit } = await auth.supabase
     .from("audits")
-    .select("id, template_id, conducted_at")
+    .select("id, template_id, store_id, conducted_at")
     .eq("id", parsed.data.audit_id)
     .single();
 
@@ -171,5 +172,25 @@ export async function completeAudit(
 
   revalidatePath("/audits");
   revalidatePath(`/audits/${audit.id}`);
+
+  // Fire-and-forget: notify store users and admins about completed audit
+  (async () => {
+    try {
+      const [{ data: storeData }, { data: templateData }, { data: conductorProfile }] = await Promise.all([
+        auth.supabase.from("stores").select("name").eq("id", audit.store_id).single(),
+        auth.supabase.from("audit_templates").select("name").eq("id", audit.template_id).single(),
+        auth.supabase.from("profiles").select("full_name").eq("user_id", auth.userId).single(),
+      ]);
+      await notifyAuditCompleted({
+        auditId: audit.id,
+        storeId: audit.store_id,
+        storeName: storeData?.name ?? "Unknown Store",
+        templateName: templateData?.name ?? "Audit",
+        score,
+        conductorName: conductorProfile?.full_name ?? "Unknown",
+      });
+    } catch { /* ignore notification errors */ }
+  })();
+
   return { data: { score }, error: null };
 }

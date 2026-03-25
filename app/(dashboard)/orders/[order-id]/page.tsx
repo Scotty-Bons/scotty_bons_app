@@ -13,6 +13,7 @@ import { OrderStatusActions } from "@/components/orders/order-status-actions";
 import { DeleteOrderButton } from "@/components/orders/delete-order-button";
 import { EditOrderButton } from "@/components/orders/edit-order-button";
 import { FulfillOrderButton } from "@/components/orders/fulfill-order-button";
+import { ExportOrderPdfButton } from "@/components/orders/export-order-pdf-button";
 
 export default async function OrderDetailPage({
   params,
@@ -81,26 +82,24 @@ export default async function OrderDetailPage({
     }
   }
 
-  // For admin/commissary: fetch submitter name and store name
+  // Fetch store name for all roles (needed for PDF export)
   const isAdmin = profile.role === "admin" || profile.role === "commissary";
   let submitterName: string | null = null;
-  let storeName: string | null = null;
+
+  const { data: storeRow } = await supabase
+    .from("stores")
+    .select("name")
+    .eq("id", order.store_id)
+    .single();
+  const storeName = storeRow?.name ?? null;
 
   if (isAdmin) {
     const adminClient = createAdminClient();
-    const [{ data: submitterAuth }, { data: store }] = await Promise.all([
-      adminClient.auth.admin.getUserById(order.submitted_by),
-      supabase
-        .from("stores")
-        .select("name")
-        .eq("id", order.store_id)
-        .single(),
-    ]);
+    const { data: submitterAuth } = await adminClient.auth.admin.getUserById(order.submitted_by);
     submitterName =
       (submitterAuth?.user?.user_metadata?.name as string | undefined) ??
       submitterAuth?.user?.email ??
       null;
-    storeName = store?.name ?? null;
   }
 
   const orderItems = items ?? [];
@@ -172,6 +171,16 @@ export default async function OrderDetailPage({
             orderId={order.id}
             currentStatus={status}
             role={profile.role}
+          />
+          <ExportOrderPdfButton
+            order={{ id: order.id, status: order.status, created_at: order.created_at }}
+            items={orderItems.map((i) => ({
+              product_name: i.product_name,
+              modifier: i.modifier,
+              quantity: i.quantity,
+              unit_price: Number(i.unit_price),
+            }))}
+            storeName={storeName ?? "Store"}
           />
           {invoiceId && (
             <Link href={`/invoices/${invoiceId}`}>

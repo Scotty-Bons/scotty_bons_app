@@ -7,6 +7,7 @@ import {
   createOrderSchema,
   type CreateOrderValues,
 } from "@/lib/validations/orders";
+import { notifyOrderSubmitted } from "@/lib/email/order-notifications";
 
 export async function getOrderItemsForOrders(
   orderIds: string[]
@@ -77,6 +78,29 @@ export async function createOrder(
   }
 
   revalidatePath("/orders");
+
+  // Fire-and-forget: notify admins about new order
+  (async () => {
+    try {
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("store_id")
+        .eq("user_id", user.id)
+        .single();
+      if (profileData?.store_id) {
+        const { data: storeData } = await supabase
+          .from("stores")
+          .select("name")
+          .eq("id", profileData.store_id)
+          .single();
+        await notifyOrderSubmitted(
+          orderId,
+          storeData?.name ?? "Unknown Store",
+          parsed.data.items.length,
+        );
+      }
+    } catch { /* ignore notification errors */ }
+  })();
 
   return { data: { id: orderId }, error: null };
 }

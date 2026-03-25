@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
+import { ExportAuditPdfButton } from "@/components/audits/export-audit-pdf-button";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -157,6 +158,27 @@ export default async function AuditDetailPage({
           >
             {isCompleted ? "Completed" : "In Progress"}
           </Badge>
+          {isCompleted && (
+            <ExportAuditPdfButton
+              audit={{
+                id: audit.id,
+                score: audit.score,
+                conducted_at: audit.conducted_at,
+                notes: audit.notes,
+              }}
+              categories={categories.map((cat) => ({
+                name: cat.name,
+                items: (itemsByCategory[cat.id] ?? []).map((item) => ({
+                  label: item.label,
+                  rating: responseMap[item.id]?.rating ?? null,
+                  notes: responseMap[item.id]?.notes ?? null,
+                })),
+              }))}
+              storeName={store?.name ?? "Unknown Store"}
+              templateName={template?.name ?? "Audit"}
+              conductorName={conductor?.full_name ?? "Unknown"}
+            />
+          )}
           {canConduct && !isCompleted && (
             <Button asChild size="sm">
               <Link href={`/audits/${auditId}/conduct`}>

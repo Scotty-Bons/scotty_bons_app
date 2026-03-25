@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { TERMINAL_STATUSES } from "@/lib/constants/order-status";
 import type { ActionResult, OrderStatus } from "@/lib/types";
+import {
+  notifyOrderApproved,
+  notifyOrderDeclined,
+  notifyOrderFulfilled,
+} from "@/lib/email/order-notifications";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ACTIONABLE_STATUSES: OrderStatus[] = ["approved", "declined"];
@@ -45,10 +50,10 @@ export async function updateOrderStatus(
     return { data: null, error: "Unauthorized." };
   }
 
-  // Fetch current status to validate the transition
+  // Fetch current status and submitter info for notification
   const { data: order } = await supabase
     .from("orders")
-    .select("status")
+    .select("status, submitted_by, store_id")
     .eq("id", orderId)
     .single();
 
@@ -76,6 +81,22 @@ export async function updateOrderStatus(
 
   revalidatePath("/orders");
   revalidatePath(`/orders/${orderId}`);
+
+  // Fire-and-forget email notifications
+  (async () => {
+    try {
+      if (newStatus === "approved") {
+        const [{ data: storeData }, { count: itemCount }] = await Promise.all([
+          supabase.from("stores").select("name").eq("id", order.store_id).single(),
+          supabase.from("order_items").select("id", { count: "exact", head: true }).eq("order_id", orderId),
+        ]);
+        await notifyOrderApproved(orderId, storeData?.name ?? "Unknown", order.submitted_by, itemCount ?? 0);
+      } else if (newStatus === "declined") {
+        await notifyOrderDeclined(orderId, order.submitted_by, declineReason ?? null);
+      }
+    } catch { /* ignore notification errors */ }
+  })();
+
   return { data: undefined, error: null };
 }
 
@@ -188,6 +209,26 @@ export async function fulfillOrder(
 
   revalidatePath("/orders");
   revalidatePath(`/orders/${orderId}`);
+
+  // Fire-and-forget: notify store user about fulfillment
+  (async () => {
+    try {
+      const { data: orderData } = await supabase
+        .from("orders")
+        .select("submitted_by")
+        .eq("id", orderId)
+        .single();
+      const { data: invoice } = await supabase
+        .from("invoices")
+        .select("id, invoice_number")
+        .eq("order_id", orderId)
+        .single();
+      if (orderData && invoice) {
+        await notifyOrderFulfilled(orderId, orderData.submitted_by, invoice.id, invoice.invoice_number);
+      }
+    } catch { /* ignore notification errors */ }
+  })();
+
   return { data: undefined, error: null };
 }
 
