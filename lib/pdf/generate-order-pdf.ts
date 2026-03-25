@@ -2,7 +2,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
 export function generateOrderPdf(
-  order: { id: string; status: string; created_at: string },
+  order: { id: string; order_number: string; status: string; created_at: string },
   items: {
     product_name: string;
     modifier: string;
@@ -19,7 +19,7 @@ export function generateOrderPdf(
   doc.text("Order Report", 14, 22);
 
   doc.setFontSize(11);
-  doc.text(`Order: #${order.id.slice(0, 8)}`, 14, 32);
+  doc.text(`Order: ${order.order_number}`, 14, 32);
   doc.text(`Store: ${storeName}`, 14, 39);
   doc.text(`Status: ${order.status}`, 14, 46);
   doc.text(

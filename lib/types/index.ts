@@ -45,6 +45,7 @@ export type OrderStatus = "submitted" | "approved" | "declined" | "fulfilled";
 
 export type OrderRow = {
   id: string;
+  order_number: string;
   store_id: string;
   store_name?: string;
   submitted_by: string;

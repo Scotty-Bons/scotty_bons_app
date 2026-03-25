@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 interface ExportOrderPdfButtonProps {
-  order: { id: string; status: string; created_at: string };
+  order: { id: string; order_number: string; status: string; created_at: string };
   items: {
     product_name: string;
     modifier: string;
@@ -30,7 +30,7 @@ export function ExportOrderPdfButton({
       const { downloadPdf } = await import("@/lib/pdf/download-pdf");
       const blob = generateOrderPdf(order, items, storeName);
       const date = new Date().toISOString().slice(0, 10);
-      downloadPdf(blob, `order-${order.id.slice(0, 8)}-${date}.pdf`);
+      downloadPdf(blob, `${order.order_number}-${date}.pdf`);
     } catch {
       toast.error("Failed to generate PDF. Please try again.");
     } finally {

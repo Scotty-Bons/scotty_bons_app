@@ -76,7 +76,7 @@ export default async function OrdersPage({
   // Build filtered query
   let query = supabase
     .from("orders")
-    .select("id, store_id, submitted_by, status, created_at, updated_at")
+    .select("id, order_number, store_id, submitted_by, status, created_at, updated_at")
     .order("created_at", { ascending: false });
 
   if (statusFilter) {
@@ -140,6 +140,7 @@ export default async function OrdersPage({
     orders = orders.filter(
       (o) =>
         o.id.toLowerCase().startsWith(q) ||
+        (o.order_number ?? "").toLowerCase().includes(q) ||
         (storeNames[o.store_id] ?? "").toLowerCase().includes(q),
     );
   }
@@ -157,6 +158,7 @@ export default async function OrdersPage({
   // Prepare serializable order data for client component
   const orderData = orders.map((order) => ({
     id: order.id,
+    order_number: order.order_number,
     store_id: order.store_id,
     status: order.status as OrderStatus,
     created_at: order.created_at,

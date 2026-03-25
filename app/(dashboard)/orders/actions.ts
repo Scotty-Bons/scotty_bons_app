@@ -88,13 +88,13 @@ export async function createOrder(
         .eq("user_id", user.id)
         .single();
       if (profileData?.store_id) {
-        const { data: storeData } = await supabase
-          .from("stores")
-          .select("name")
-          .eq("id", profileData.store_id)
-          .single();
+        const [{ data: storeData }, { data: orderData }] = await Promise.all([
+          supabase.from("stores").select("name").eq("id", profileData.store_id).single(),
+          supabase.from("orders").select("order_number").eq("id", orderId).single(),
+        ]);
         await notifyOrderSubmitted(
           orderId,
+          orderData?.order_number ?? orderId.slice(0, 8),
           storeData?.name ?? "Unknown Store",
           parsed.data.items.length,
         );

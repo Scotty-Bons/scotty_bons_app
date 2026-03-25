@@ -55,7 +55,7 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase
       .from("orders")
-      .select("id, store_id, status, created_at")
+      .select("id, order_number, store_id, status, created_at")
       .order("created_at", { ascending: false }),
     supabase
       .from("order_items")
@@ -367,7 +367,7 @@ export default async function DashboardPage() {
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium">
-                        Order {order.id.slice(0, 8)}
+                        {order.order_number}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {dateFmt.format(new Date(order.created_at))}

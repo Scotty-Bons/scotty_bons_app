@@ -53,7 +53,7 @@ export async function updateOrderStatus(
   // Fetch current status and submitter info for notification
   const { data: order } = await supabase
     .from("orders")
-    .select("status, submitted_by, store_id")
+    .select("status, order_number, submitted_by, store_id")
     .eq("id", orderId)
     .single();
 
@@ -90,9 +90,9 @@ export async function updateOrderStatus(
           supabase.from("stores").select("name").eq("id", order.store_id).single(),
           supabase.from("order_items").select("id", { count: "exact", head: true }).eq("order_id", orderId),
         ]);
-        await notifyOrderApproved(orderId, storeData?.name ?? "Unknown", order.submitted_by, itemCount ?? 0);
+        await notifyOrderApproved(orderId, order.order_number, storeData?.name ?? "Unknown", order.submitted_by, itemCount ?? 0);
       } else if (newStatus === "declined") {
-        await notifyOrderDeclined(orderId, order.submitted_by, declineReason ?? null);
+        await notifyOrderDeclined(orderId, order.order_number, order.submitted_by, declineReason ?? null);
       }
     } catch { /* ignore notification errors */ }
   })();
@@ -215,7 +215,7 @@ export async function fulfillOrder(
     try {
       const { data: orderData } = await supabase
         .from("orders")
-        .select("submitted_by")
+        .select("submitted_by, order_number")
         .eq("id", orderId)
         .single();
       const { data: invoice } = await supabase
@@ -224,7 +224,7 @@ export async function fulfillOrder(
         .eq("order_id", orderId)
         .single();
       if (orderData && invoice) {
-        await notifyOrderFulfilled(orderId, orderData.submitted_by, invoice.id, invoice.invoice_number);
+        await notifyOrderFulfilled(orderId, orderData.order_number, orderData.submitted_by, invoice.id, invoice.invoice_number);
       }
     } catch { /* ignore notification errors */ }
   })();

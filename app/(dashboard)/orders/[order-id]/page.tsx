@@ -41,7 +41,7 @@ export default async function OrderDetailPage({
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id, store_id, submitted_by, status, decline_reason, fulfilled_at, created_at, updated_at"
+      "id, order_number, store_id, submitted_by, status, decline_reason, fulfilled_at, created_at, updated_at"
     )
     .eq("id", orderId)
     .single();
@@ -144,12 +144,12 @@ export default async function OrderDetailPage({
           Orders
         </Link>
         <span className="text-muted-foreground">/</span>
-        <span className="font-medium">Order #{order.id.slice(0, 8)}</span>
+        <span className="font-medium">{order.order_number}</span>
       </nav>
 
       {/* Order header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Order #{order.id.slice(0, 8)}</h1>
+        <h1 className="text-2xl font-bold">{order.order_number}</h1>
         <div className="flex items-center gap-3">
           <Badge variant="status" style={STATUS_STYLES[status]}>{STATUS_LABELS[status]}</Badge>
           <OrderStatusActions
@@ -173,7 +173,7 @@ export default async function OrderDetailPage({
             role={profile.role}
           />
           <ExportOrderPdfButton
-            order={{ id: order.id, status: order.status, created_at: order.created_at }}
+            order={{ id: order.id, order_number: order.order_number, status: order.status, created_at: order.created_at }}
             items={orderItems.map((i) => ({
               product_name: i.product_name,
               modifier: i.modifier,

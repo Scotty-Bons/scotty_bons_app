@@ -29,7 +29,7 @@ export default async function EditOrderPage({
   // Fetch order
   const { data: order } = await supabase
     .from("orders")
-    .select("id, status, store_id")
+    .select("id, order_number, status, store_id")
     .eq("id", orderId)
     .single();
 
@@ -97,7 +97,7 @@ export default async function EditOrderPage({
           className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
         >
           <ArrowLeft className="size-3.5" />
-          Order #{orderId.slice(0, 8)}
+          {order.order_number}
         </Link>
         <span className="text-muted-foreground">/</span>
         <span className="font-medium">Edit</span>

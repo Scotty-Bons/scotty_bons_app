@@ -11,6 +11,7 @@ import { OrderSelectableList } from "@/components/orders/order-selection-summary
 
 interface OrderData {
   id: string;
+  order_number: string;
   store_id: string;
   status: OrderStatus;
   created_at: string;
@@ -54,7 +55,7 @@ export function OrderListWithSelection({ orders }: OrderListWithSelectionProps) 
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium">
-                      Order {order.id.slice(0, 8)}
+                      {order.order_number}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {new Intl.DateTimeFormat("en-CA", {
