@@ -142,7 +142,7 @@ export default async function AuditsPage({
     }).format(new Date(timestamp));
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Audits</h1>
         <div className="flex items-center gap-2">
@@ -165,7 +165,9 @@ export default async function AuditsPage({
       {audits.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <ClipboardCheck className="mx-auto size-12 text-muted-foreground mb-4" />
+            <div className="flex size-16 mx-auto items-center justify-center rounded-full bg-primary-light mb-4">
+              <ClipboardCheck className="size-8 text-primary" />
+            </div>
             <h3 className="text-lg font-semibold mb-2">No audits yet</h3>
             <p className="text-sm text-muted-foreground mb-4">
               {canConduct
@@ -175,47 +177,51 @@ export default async function AuditsPage({
           </CardContent>
         </Card>
       ) : (
-        <Card className="divide-y">
+        <div className="space-y-3">
           {audits.map((audit) => {
             const isCompleted = !!audit.conducted_at;
             return (
-              <Link
-                key={audit.id}
-                href={`/audits/${audit.id}`}
-                className="flex items-center justify-between gap-4 px-4 py-3 border-l-4 border-green-300 hover:bg-muted/50 transition-colors"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">
-                    {audit.template_name ?? "Audit"} — {audit.store_name ?? "Unknown Store"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDate(audit.created_at)}
-                    {audit.conducted_by_name ? ` · by ${audit.conducted_by_name}` : ""}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
+              <Card key={audit.id} className="hover:shadow-md transition-shadow">
+                <Link
+                  href={`/audits/${audit.id}`}
+                  className="flex items-center gap-3 px-4 py-4"
+                >
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-light">
+                    <ClipboardCheck className="size-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold">
+                        {audit.template_name ?? "Audit"} — {audit.store_name ?? "Unknown Store"}
+                      </p>
+                      <Badge
+                        variant="status"
+                        style={
+                          isCompleted
+                            ? { backgroundColor: "#dcfce7", color: "#166534", borderColor: "#4ade80" }
+                            : { backgroundColor: "#fef3c7", color: "#92400e", borderColor: "#fbbf24" }
+                        }
+                      >
+                        {isCompleted ? "Completed" : "In Progress"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {formatDate(audit.created_at)}
+                      {audit.conducted_by_name ? ` · by ${audit.conducted_by_name}` : ""}
+                    </p>
+                  </div>
                   {isCompleted && audit.score !== null && (
                     <span
-                      className={`text-sm font-medium px-2 py-0.5 rounded border ${getScoreColor(audit.score)}`}
+                      className={`text-sm font-medium px-2.5 py-1 rounded-full border shrink-0 ${getScoreColor(audit.score)}`}
                     >
                       {audit.score}% — {getScoreLabel(audit.score)}
                     </span>
                   )}
-                  <Badge
-                    variant="status"
-                    style={
-                      isCompleted
-                        ? { backgroundColor: "#15803d", color: "#fff", borderColor: "transparent" }
-                        : { backgroundColor: "#d97706", color: "#fff", borderColor: "transparent" }
-                    }
-                  >
-                    {isCompleted ? "Completed" : "In Progress"}
-                  </Badge>
-                </div>
-              </Link>
+                </Link>
+              </Card>
             );
           })}
-        </Card>
+        </div>
       )}
     </div>
   );

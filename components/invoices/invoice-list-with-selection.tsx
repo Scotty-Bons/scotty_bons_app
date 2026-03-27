@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatPrice } from "@/lib/utils";
 import { InvoiceSelectableList } from "@/components/invoices/invoice-selection-summary";
+import { FileText, ChevronRight } from "lucide-react";
 
 interface InvoiceData {
   id: string;
@@ -27,50 +28,58 @@ export function InvoiceListWithSelection({ invoices }: InvoiceListWithSelectionP
   return (
     <InvoiceSelectableList invoiceIds={invoiceIds}>
       {({ isSelected, toggleSelection }) => (
-        <Card className="divide-y">
+        <div className="space-y-3">
           {invoices.map((invoice) => (
-            <div
+            <Card
               key={invoice.id}
-              className="flex items-center gap-2 border-l-4 border-blue-300 hover:bg-muted/50 transition-colors"
+              className="overflow-hidden hover:shadow-md transition-shadow"
             >
-              {invoiceIds.length > 1 && (
-                <div
-                  className="pl-3 py-3 flex items-center"
-                  onClick={(e) => e.stopPropagation()}
+              <div className="flex items-center gap-3">
+                {invoiceIds.length > 1 && (
+                  <div
+                    className="pl-4 py-4 flex items-center"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Checkbox
+                      checked={isSelected(invoice.id)}
+                      onCheckedChange={() => toggleSelection(invoice.id)}
+                    />
+                  </div>
+                )}
+                <Link
+                  href={`/invoices/${invoice.id}`}
+                  className="flex flex-1 items-center gap-3 px-4 py-4"
                 >
-                  <Checkbox
-                    checked={isSelected(invoice.id)}
-                    onCheckedChange={() => toggleSelection(invoice.id)}
-                  />
-                </div>
-              )}
-              <Link
-                href={`/invoices/${invoice.id}`}
-                className="flex flex-1 items-center justify-between gap-4 px-4 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">
-                    {invoice.invoice_number}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {invoice.store_name}
-                    {invoice.order_date
-                      ? ` · Order: ${dateFmt.format(new Date(invoice.order_date))}`
-                      : ""}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4 shrink-0 text-sm">
-                  <span className="font-medium">
-                    {formatPrice(invoice.grand_total)}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {dateFmt.format(new Date(invoice.created_at))}
-                  </span>
-                </div>
-              </Link>
-            </div>
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-light">
+                    <FileText className="size-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold">
+                      {invoice.invoice_number}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {invoice.store_name}
+                      {invoice.order_date
+                        ? ` · Order: ${dateFmt.format(new Date(invoice.order_date))}`
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="text-right">
+                      <p className="text-sm font-semibold">
+                        {formatPrice(invoice.grand_total)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {dateFmt.format(new Date(invoice.created_at))}
+                      </p>
+                    </div>
+                    <ChevronRight className="size-4 text-muted-foreground" />
+                  </div>
+                </Link>
+              </div>
+            </Card>
           ))}
-        </Card>
+        </div>
       )}
     </InvoiceSelectableList>
   );

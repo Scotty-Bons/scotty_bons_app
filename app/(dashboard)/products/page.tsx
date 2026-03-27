@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { CategoriesClient } from "@/components/products/categories-client";
-import { ProductsClient } from "@/components/products/products-client";
+import { CatalogAdmin } from "@/components/products/catalog-admin";
 import { CatalogBrowser } from "@/components/products/catalog-browser";
 import type { CategoryRow, ProductRow } from "@/lib/types";
 
@@ -31,6 +30,7 @@ export default async function ProductsPage() {
   const { data: productsRaw, error: productsError } = await supabase
     .from("products")
     .select("id, name, price, modifier, category_id, image_url")
+    .eq("active", true)
     .order("name");
 
   const queryError = categoriesError || productsError;
@@ -67,22 +67,18 @@ export default async function ProductsPage() {
   }));
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Products</h1>
+    <div className="max-w-5xl mx-auto space-y-6">
+      <h1 className="text-xl font-bold">Products</h1>
       {queryError && (
         <div className="rounded-md border border-destructive bg-destructive/10 p-4 text-sm text-destructive">
           Failed to load some data. Please refresh the page.
         </div>
       )}
       {isAdmin ? (
-        <>
-          <CategoriesClient categories={categories} isAdmin={isAdmin} />
-          <ProductsClient
-            products={productsWithCategory}
-            categories={categories}
-            isAdmin={isAdmin}
-          />
-        </>
+        <CatalogAdmin
+          products={productsWithCategory}
+          categories={categories}
+        />
       ) : (
         <CatalogBrowser
           categories={categories}

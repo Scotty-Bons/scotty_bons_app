@@ -31,7 +31,9 @@ export async function notifyOrderSubmitted(
   storeName: string,
   itemCount: number,
 ): Promise<void> {
+  console.log("[email] notifyOrderSubmitted called:", { orderId, orderNumber, storeName, itemCount });
   const adminEmails = await getEmailsByRole("admin");
+  console.log("[email] adminEmails:", adminEmails);
   if (adminEmails.length === 0) return;
 
   const safe = escapeHtml(storeName);

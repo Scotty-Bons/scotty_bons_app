@@ -33,10 +33,11 @@ import type { CategoryRow, ProductRow } from "@/lib/types";
 interface ProductFormProps {
   categories: CategoryRow[];
   product?: ProductRow;
+  defaultCategoryId?: string;
   onSuccess: () => void;
 }
 
-export function ProductForm({ categories, product, onSuccess }: ProductFormProps) {
+export function ProductForm({ categories, product, defaultCategoryId, onSuccess }: ProductFormProps) {
   const [isPending, startTransition] = useTransition();
   const [formError, setFormError] = useState<string | null>(null);
   const [priceDisplay, setPriceDisplay] = useState(
@@ -54,7 +55,7 @@ export function ProductForm({ categories, product, onSuccess }: ProductFormProps
       name: product?.name ?? "",
       price: product?.price ?? 0,
       modifier: product?.modifier ?? "",
-      category_id: product?.category_id ?? "",
+      category_id: product?.category_id ?? defaultCategoryId ?? "",
     },
   });
 

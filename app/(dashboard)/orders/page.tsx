@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Package, Plus, Search } from "lucide-react";
+import { Package, Plus, Search, ShoppingCart } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -168,13 +168,33 @@ export default async function OrdersPage({
   }));
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
+      {/* CTA hero for store users */}
+      {isStore && (
+        <Link href="/orders/new" className="block">
+          <Card className="bg-primary border-0 text-white overflow-hidden hover:bg-primary/90 transition-colors shadow-lg">
+            <CardContent className="flex items-center justify-between p-5">
+              <div>
+                <h2 className="text-lg font-bold">Place a new order</h2>
+                <p className="text-sm text-white/80">Restock your inventory</p>
+              </div>
+              <div className="flex size-12 items-center justify-center rounded-xl bg-white/20">
+                <ShoppingCart className="size-6" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      )}
+
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Orders</h1>
-        {isStore && (
-          <Button asChild>
+        <h1 className="text-xl font-bold">
+          {isStore ? "Recent Orders" : "Orders"}
+        </h1>
+        {!isStore && (
+          <Button asChild size="sm">
             <Link href="/orders/new">
-              <Plus className="size-4 mr-2" />
+              <Plus className="size-4 mr-1.5" />
               New Order
             </Link>
           </Button>
@@ -189,7 +209,9 @@ export default async function OrdersPage({
       {orders.length === 0 && hasActiveFilters ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <Search className="mx-auto size-12 text-muted-foreground mb-4" />
+            <div className="flex size-16 mx-auto items-center justify-center rounded-full bg-primary-light mb-4">
+              <Search className="size-8 text-primary" />
+            </div>
             <h3 className="text-lg font-semibold mb-2">
               No orders match your filters
             </h3>
@@ -204,7 +226,9 @@ export default async function OrdersPage({
       ) : orders.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <Package className="mx-auto size-12 text-muted-foreground mb-4" />
+            <div className="flex size-16 mx-auto items-center justify-center rounded-full bg-primary-light mb-4">
+              <Package className="size-8 text-primary" />
+            </div>
             <h3 className="text-lg font-semibold mb-2">No orders yet</h3>
             <p className="text-sm text-muted-foreground mb-4">
               {isStore

@@ -35,7 +35,6 @@ export function EditStoreForm({ store, onSuccess }: EditStoreFormProps) {
       address: store.address ?? "",
       postal_code: store.postal_code ?? "",
       phone: store.phone ?? "",
-      email: store.email ?? "",
     },
   });
 
@@ -128,20 +127,6 @@ export function EditStoreForm({ store, onSuccess }: EditStoreFormProps) {
             )}
           />
         </div>
-
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email</FormLabel>
-              <FormControl>
-                <Input type="email" placeholder="store@example.com" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         <div className="flex justify-end gap-2 pt-2">
           <Button type="submit" disabled={isPending}>

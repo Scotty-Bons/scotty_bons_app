@@ -44,13 +44,6 @@ export const createStoreSchema = z.object({
   address: z.string().max(500, "Address is too long."),
   postal_code: z.string().max(20, "Postal code is too long."),
   phone: z.string().max(50, "Phone number is too long."),
-  email: z
-    .string()
-    .max(200, "Email is too long.")
-    .refine(
-      (val) => val === "" || z.string().email().safeParse(val).success,
-      "Please enter a valid email address.",
-    ),
 });
 
 export type CreateStoreValues = z.infer<typeof createStoreSchema>;
@@ -61,13 +54,6 @@ export const updateStoreSchema = z.object({
   address: z.string().max(500, "Address is too long."),
   postal_code: z.string().max(20, "Postal code is too long."),
   phone: z.string().max(50, "Phone number is too long."),
-  email: z
-    .string()
-    .max(200, "Email is too long.")
-    .refine(
-      (val) => val === "" || z.string().email().safeParse(val).success,
-      "Please enter a valid email address.",
-    ),
 });
 
 export type UpdateStoreValues = z.infer<typeof updateStoreSchema>;

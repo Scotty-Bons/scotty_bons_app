@@ -225,9 +225,9 @@ BEGIN
   SELECT COALESCE(SUM(unit_price * quantity), 0) INTO v_subtotal
     FROM order_items WHERE order_id = p_order_id;
 
-  -- Calculate tax and grand total (HST applies to subtotal + ad fee)
-  v_tax_amount := ROUND((v_subtotal + v_ad_fee) * v_tax_rate, 2);
-  v_grand_total := v_subtotal + v_ad_fee + v_tax_amount;
+  -- Calculate tax on subtotal only, then add ad fee
+  v_tax_amount := ROUND(v_subtotal * v_tax_rate, 2);
+  v_grand_total := v_subtotal + v_tax_amount + v_ad_fee;
 
   -- Insert invoice with commissary (From) and store (Bill To) info
   INSERT INTO invoices (

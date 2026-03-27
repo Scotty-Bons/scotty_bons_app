@@ -127,15 +127,17 @@ export default async function InvoicesPage({
   }));
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Invoices</h1>
+    <div className="max-w-5xl mx-auto space-y-6">
+      <h1 className="text-xl font-bold">Invoices</h1>
 
       <InvoiceFilters role={role} stores={allStores} />
 
       {invoiceList.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <FileText className="mx-auto size-12 text-muted-foreground mb-4" />
+            <div className="flex size-16 mx-auto items-center justify-center rounded-full bg-primary-light mb-4">
+              <FileText className="size-8 text-primary" />
+            </div>
             <h3 className="text-lg font-semibold mb-2">No invoices yet</h3>
             <p className="text-sm text-muted-foreground">
               Invoices are generated automatically when orders are fulfilled.

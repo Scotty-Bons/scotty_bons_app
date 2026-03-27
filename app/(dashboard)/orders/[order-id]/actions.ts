@@ -82,20 +82,20 @@ export async function updateOrderStatus(
   revalidatePath("/orders");
   revalidatePath(`/orders/${orderId}`);
 
-  // Fire-and-forget email notifications
-  (async () => {
-    try {
-      if (newStatus === "approved") {
-        const [{ data: storeData }, { count: itemCount }] = await Promise.all([
-          supabase.from("stores").select("name").eq("id", order.store_id).single(),
-          supabase.from("order_items").select("id", { count: "exact", head: true }).eq("order_id", orderId),
-        ]);
-        await notifyOrderApproved(orderId, order.order_number, storeData?.name ?? "Unknown", order.submitted_by, itemCount ?? 0);
-      } else if (newStatus === "declined") {
-        await notifyOrderDeclined(orderId, order.order_number, order.submitted_by, declineReason ?? null);
-      }
-    } catch { /* ignore notification errors */ }
-  })();
+  // Email notifications (awaited so they complete before response ends)
+  try {
+    if (newStatus === "approved") {
+      const [{ data: storeData }, { count: itemCount }] = await Promise.all([
+        supabase.from("stores").select("name").eq("id", order.store_id).single(),
+        supabase.from("order_items").select("id", { count: "exact", head: true }).eq("order_id", orderId),
+      ]);
+      await notifyOrderApproved(orderId, order.order_number, storeData?.name ?? "Unknown", order.submitted_by, itemCount ?? 0);
+    } else if (newStatus === "declined") {
+      await notifyOrderDeclined(orderId, order.order_number, order.submitted_by, declineReason ?? null);
+    }
+  } catch (e) {
+    console.error("[email] Failed to notify order status change:", e);
+  }
 
   return { data: undefined, error: null };
 }
@@ -130,28 +130,26 @@ export async function deleteOrder(
   if (role === "store") {
     // Store users can only delete their own submitted orders
     // RLS ensures they can only see their own orders
-    const { data, error } = await supabase
+    // Note: we don't use .select().single() because setting deleted_at makes
+    // the row invisible to RLS SELECT policies, causing a false "not found" error.
+    const { error, count } = await supabase
       .from("orders")
       .update({ deleted_at: new Date().toISOString() })
       .eq("id", orderId)
-      .eq("status", "submitted")
-      .select("id")
-      .single();
+      .eq("status", "submitted");
 
-    if (error || !data) {
+    if (error || count === 0) {
       return { data: null, error: "Order not found or cannot be deleted." };
     }
   } else if (["admin", "commissary"].includes(role)) {
     // Admin/commissary can delete any non-fulfilled order
-    const { data, error } = await supabase
+    const { error, count } = await supabase
       .from("orders")
       .update({ deleted_at: new Date().toISOString() })
       .eq("id", orderId)
-      .neq("status", "fulfilled")
-      .select("id")
-      .single();
+      .neq("status", "fulfilled");
 
-    if (error || !data) {
+    if (error || count === 0) {
       return { data: null, error: "Order not found or cannot be deleted." };
     }
   } else {
@@ -210,24 +208,24 @@ export async function fulfillOrder(
   revalidatePath("/orders");
   revalidatePath(`/orders/${orderId}`);
 
-  // Fire-and-forget: notify store user about fulfillment
-  (async () => {
-    try {
-      const { data: orderData } = await supabase
-        .from("orders")
-        .select("submitted_by, order_number")
-        .eq("id", orderId)
-        .single();
-      const { data: invoice } = await supabase
-        .from("invoices")
-        .select("id, invoice_number")
-        .eq("order_id", orderId)
-        .single();
-      if (orderData && invoice) {
-        await notifyOrderFulfilled(orderId, orderData.order_number, orderData.submitted_by, invoice.id, invoice.invoice_number);
-      }
-    } catch { /* ignore notification errors */ }
-  })();
+  // Notify store user about fulfillment
+  try {
+    const { data: orderData } = await supabase
+      .from("orders")
+      .select("submitted_by, order_number")
+      .eq("id", orderId)
+      .single();
+    const { data: invoice } = await supabase
+      .from("invoices")
+      .select("id, invoice_number")
+      .eq("order_id", orderId)
+      .single();
+    if (orderData && invoice) {
+      await notifyOrderFulfilled(orderId, orderData.order_number, orderData.submitted_by, invoice.id, invoice.invoice_number);
+    }
+  } catch (e) {
+    console.error("[email] Failed to notify order fulfilled:", e);
+  }
 
   return { data: undefined, error: null };
 }
@@ -289,7 +287,8 @@ export async function editOrderItems(
   const { data: products } = await supabase
     .from("products")
     .select("id, name, price, modifier")
-    .in("id", productIds);
+    .in("id", productIds)
+    .eq("active", true);
 
   if (!products || products.length !== productIds.length) {
     return { data: null, error: "One or more products not found." };

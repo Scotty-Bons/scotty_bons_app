@@ -72,7 +72,7 @@ export function InvoiceFilters({ role, stores }: InvoiceFiltersProps) {
           type="date"
           value={currentFrom}
           onChange={(e) => updateParams({ from: e.target.value })}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex h-10 w-full rounded-xl border border-input bg-muted/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary"
         />
       </div>
 
@@ -84,7 +84,7 @@ export function InvoiceFilters({ role, stores }: InvoiceFiltersProps) {
           type="date"
           value={currentTo}
           onChange={(e) => updateParams({ to: e.target.value })}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex h-10 w-full rounded-xl border border-input bg-muted/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary"
         />
       </div>
 
@@ -99,10 +99,10 @@ export function InvoiceFilters({ role, stores }: InvoiceFiltersProps) {
               updateParams({ store_id: v === "all" ? "" : v })
             }
           >
-            <SelectTrigger>
+            <SelectTrigger className="rounded-xl h-10">
               <SelectValue placeholder="All stores" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-xl">
               <SelectItem value="all">All stores</SelectItem>
               {stores.map((store) => (
                 <SelectItem key={store.id} value={store.id}>
@@ -118,21 +118,19 @@ export function InvoiceFilters({ role, stores }: InvoiceFiltersProps) {
         <label className="text-xs font-medium text-muted-foreground mb-1 block">
           Search
         </label>
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder="Invoice number..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            onBlur={() => {
-              if (searchText.trim() !== currentQ) {
-                updateParams({ q: searchText.trim() });
-              }
-            }}
-          />
-        </div>
+        <Input
+          className="h-10"
+          placeholder="Invoice number..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          onKeyDown={handleSearchKeyDown}
+          onBlur={() => {
+            if (searchText.trim() !== currentQ) {
+              updateParams({ q: searchText.trim() });
+            }
+          }}
+          leftIcon={<Search className="size-4" />}
+        />
       </div>
 
       {hasFilters && (

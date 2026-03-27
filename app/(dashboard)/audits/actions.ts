@@ -173,24 +173,24 @@ export async function completeAudit(
   revalidatePath("/audits");
   revalidatePath(`/audits/${audit.id}`);
 
-  // Fire-and-forget: notify store users and admins about completed audit
-  (async () => {
-    try {
-      const [{ data: storeData }, { data: templateData }, { data: conductorProfile }] = await Promise.all([
-        auth.supabase.from("stores").select("name").eq("id", audit.store_id).single(),
-        auth.supabase.from("audit_templates").select("name").eq("id", audit.template_id).single(),
-        auth.supabase.from("profiles").select("full_name").eq("user_id", auth.userId).single(),
-      ]);
-      await notifyAuditCompleted({
-        auditId: audit.id,
-        storeId: audit.store_id,
-        storeName: storeData?.name ?? "Unknown Store",
-        templateName: templateData?.name ?? "Audit",
-        score,
-        conductorName: conductorProfile?.full_name ?? "Unknown",
-      });
-    } catch { /* ignore notification errors */ }
-  })();
+  // Notify store users and admins about completed audit
+  try {
+    const [{ data: storeData }, { data: templateData }, { data: conductorProfile }] = await Promise.all([
+      auth.supabase.from("stores").select("name").eq("id", audit.store_id).single(),
+      auth.supabase.from("audit_templates").select("name").eq("id", audit.template_id).single(),
+      auth.supabase.from("profiles").select("full_name").eq("user_id", auth.userId).single(),
+    ]);
+    await notifyAuditCompleted({
+      auditId: audit.id,
+      storeId: audit.store_id,
+      storeName: storeData?.name ?? "Unknown Store",
+      templateName: templateData?.name ?? "Audit",
+      score,
+      conductorName: conductorProfile?.full_name ?? "Unknown",
+    });
+  } catch (e) {
+    console.error("[email] Failed to notify audit completed:", e);
+  }
 
   return { data: { score }, error: null };
 }

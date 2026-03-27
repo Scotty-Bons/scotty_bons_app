@@ -5,9 +5,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatPrice } from "@/lib/utils";
-import { STATUS_STYLES, STATUS_LABELS, STATUS_BORDER_COLORS } from "@/lib/constants/order-status";
+import { STATUS_STYLES, STATUS_LABELS } from "@/lib/constants/order-status";
 import type { OrderStatus } from "@/lib/types";
 import { OrderSelectableList } from "@/components/orders/order-selection-summary";
+import { Package, ChevronRight } from "lucide-react";
 
 interface OrderData {
   id: string;
@@ -30,59 +31,74 @@ export function OrderListWithSelection({ orders }: OrderListWithSelectionProps) 
   return (
     <OrderSelectableList orderIds={orderIds}>
       {({ isSelected, toggleSelection }) => (
-        <Card className="divide-y">
+        <div className="space-y-3">
           {orders.map((order) => {
             const status = order.status;
             return (
-              <div
+              <Card
                 key={order.id}
-                className={`flex items-center gap-2 border-l-4 ${STATUS_BORDER_COLORS[status]} hover:bg-muted/50 transition-colors`}
+                className="overflow-hidden hover:shadow-md transition-shadow"
               >
-                {orderIds.length > 1 && (
-                  <div
-                    className="pl-3 py-3 flex items-center"
-                    onClick={(e) => e.stopPropagation()}
+                <div className="flex items-center gap-3">
+                  {orderIds.length > 1 && (
+                    <div
+                      className="pl-4 py-4 flex items-center"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Checkbox
+                        checked={isSelected(order.id)}
+                        onCheckedChange={() => toggleSelection(order.id)}
+                      />
+                    </div>
+                  )}
+                  <Link
+                    href={`/orders/${order.id}`}
+                    className="flex flex-1 items-center gap-3 px-4 py-4"
                   >
-                    <Checkbox
-                      checked={isSelected(order.id)}
-                      onCheckedChange={() => toggleSelection(order.id)}
-                    />
-                  </div>
-                )}
-                <Link
-                  href={`/orders/${order.id}`}
-                  className="flex flex-1 items-center justify-between gap-4 px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">
-                      {order.order_number}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Intl.DateTimeFormat("en-CA", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      }).format(new Date(order.created_at))}
-                      {order.item_count > 0
-                        ? ` · ${order.item_count} ${order.item_count === 1 ? "item" : "items"}`
-                        : ""}
-                      {order.store_name ? ` · ${order.store_name}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    {order.total > 0 && (
-                      <span className="text-sm font-medium">
-                        {formatPrice(order.total)}
-                      </span>
-                    )}
-                    <Badge variant="status" style={STATUS_STYLES[status]}>
-                      {STATUS_LABELS[status]}
-                    </Badge>
-                  </div>
-                </Link>
-              </div>
+                    {/* Orange icon */}
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-light">
+                      <Package className="size-5 text-primary" />
+                    </div>
+
+                    {/* Order info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold">
+                          {order.order_number}
+                        </p>
+                        <Badge variant="status" style={STATUS_STYLES[status]}>
+                          {STATUS_LABELS[status]}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {new Intl.DateTimeFormat("en-CA", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        }).format(new Date(order.created_at))}
+                        {order.store_name ? ` · ${order.store_name}` : ""}
+                      </p>
+                    </div>
+
+                    {/* Right side: total + arrow */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="text-right">
+                        {order.total > 0 && (
+                          <p className="text-sm font-semibold">{formatPrice(order.total)}</p>
+                        )}
+                        {order.item_count > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {order.item_count} {order.item_count === 1 ? "item" : "items"}
+                          </p>
+                        )}
+                      </div>
+                      <ChevronRight className="size-4 text-muted-foreground" />
+                    </div>
+                  </Link>
+                </div>
+              </Card>
             );
           })}
-        </Card>
+        </div>
       )}
     </OrderSelectableList>
   );

@@ -72,7 +72,31 @@
       "Bash(npx supabase:*)",
       "Bash(gh auth:*)",
       "Bash(git remote:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(cmd /c \"dir /s /b C:\\\\Padoque\\\\scotty-ops\\\\_bmad\")",
+      "Bash(cmd /c \"dir C:\\\\Padoque\\\\scotty-ops\\\\_bmad\\\\_config\\\\custom\" 2>&1)",
+      "Bash(cmd /c \"dir C:\\\\Users\\\\gusta\\\\.claude\")",
+      "Bash(cmd /c \"dir /a C:\\\\Users\\\\gusta\\\\.claude\" 2>&1)",
+      "Bash(cmd /c \"dir C:\\\\Padoque\\\\scotty-ops\\\\scotty-ops\" 2>&1)",
+      "Bash(cmd /c \"dir /a C:\\\\Padoque\\\\scotty-ops\\\\_bmad\" 2>&1)",
+      "Bash(ls -la /c/Padoque/scotty-ops/app/\\\\\\(auth\\\\\\)/)",
+      "Bash(find /c/Padoque/scotty-ops -type f \\\\\\(-name *.json -o -name *.txt \\\\\\) -path *epic* -o -path *sprint*)",
+      "Bash(find /c/Padoque -type f \\\\\\(-name *scotty* -o -name *PRD* -o -name *prd* \\\\\\) ! -path */node_modules/*)",
+      "Bash(/dev/null ! -path \"*node_modules*\" ! -path \"*.git*\")",
+      "Bash(/dev/null ! -path */node_modules/*)",
+      "Bash(npx shadcn@latest add textarea --yes)",
+      "Bash(npx shadcn@latest add switch --yes)",
+      "Bash(git reset:*)",
+      "Bash(echo \"SELECT column_name FROM information_schema.columns WHERE table_name = ''''products'''' AND table_schema = ''''public'''' ORDER BY ordinal_position;\")",
+      "Bash(npm ls:*)",
+      "Bash(find /c/Padoque/scotty-ops/app/api -type f \\\\\\(-name *.ts -o -name *.tsx \\\\\\))",
+      "Bash(find \"/c/Padoque/scotty-ops/app/\\(dashboard\\)\" -type f -name \"*.tsx\" -o -name \"*.ts\")",
+      "Bash(find /c/Padoque/scotty-ops -maxdepth 3 -type f \\\\\\(-name *.md -o -name *.txt \\\\\\))",
+      "Bash(git log:*)",
+      "Bash(npm install:*)",
+      "Bash(find /c/Padoque/scotty-ops/app -type f \\\\\\(-name *.tsx -o -name *.ts -o -name *.jsx -o -name *.js \\\\\\))",
+      "Bash(find /c/Padoque/scotty-ops/components -type f \\\\\\(-name *.tsx -o -name *.ts -o -name *.jsx -o -name *.js \\\\\\))",
+      "Bash(find /c/Padoque/scotty-ops -type f \\\\\\(-name *.css -o -name globals.css \\\\\\) -not -path */node_modules/*)"
     ]
   }
 }

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { notifyUserCreated } from "@/lib/email/user-notifications";
 import type { ActionResult, UserRow, StoreRow } from "@/lib/types";
 import { z } from "zod";
 import { createUserSchema, createStoreSchema, updateUserSchema, updateStoreSchema, type CreateUserValues, type CreateStoreValues, type UpdateUserValues, type UpdateStoreValues } from "@/lib/validations/users";
@@ -85,6 +86,14 @@ export async function createUser(
       .single();
     store_name = store?.name ?? null;
   }
+
+  // Send welcome email (fire-and-forget — don't block user creation on email delivery)
+  notifyUserCreated({
+    email: safeValues.email,
+    name: safeValues.name,
+    role: safeValues.role,
+    storeName: store_name,
+  }).catch((err) => console.error("[createUser] Failed to send welcome email:", err));
 
   return {
     data: {
@@ -222,9 +231,8 @@ export async function createStore(
       address: parsed.data.address ?? "",
       postal_code: parsed.data.postal_code ?? "",
       phone: parsed.data.phone ?? "",
-      email: parsed.data.email ?? "",
     })
-    .select("id, name, business_name, address, postal_code, phone, email")
+    .select("id, name, business_name, address, postal_code, phone")
     .single();
 
   if (error) return { data: null, error: "Failed to create store. Please try again." };
@@ -255,7 +263,6 @@ export async function updateStore(
       address: parsed.data.address ?? "",
       postal_code: parsed.data.postal_code ?? "",
       phone: parsed.data.phone ?? "",
-      email: parsed.data.email ?? "",
     })
     .eq("id", storeId);
 
@@ -275,13 +282,43 @@ export async function deleteStore(
   const supabase = await createClient();
 
   // Check if any users are assigned to this store
-  const { count } = await supabase
+  const { count: userCount } = await supabase
     .from("profiles")
     .select("user_id", { count: "exact", head: true })
     .eq("store_id", storeId);
 
-  if (count && count > 0) {
+  if (userCount && userCount > 0) {
     return { data: null, error: "Cannot delete a store that has users assigned to it. Reassign or remove users first." };
+  }
+
+  // Check if any orders reference this store
+  const { count: orderCount } = await supabase
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("store_id", storeId);
+
+  if (orderCount && orderCount > 0) {
+    return { data: null, error: "Cannot delete a store that has orders. Remove all orders for this store first." };
+  }
+
+  // Check if any invoices reference this store
+  const { count: invoiceCount } = await supabase
+    .from("invoices")
+    .select("id", { count: "exact", head: true })
+    .eq("store_id", storeId);
+
+  if (invoiceCount && invoiceCount > 0) {
+    return { data: null, error: "Cannot delete a store that has invoices." };
+  }
+
+  // Check if any audits reference this store
+  const { count: auditCount } = await supabase
+    .from("audits")
+    .select("id", { count: "exact", head: true })
+    .eq("store_id", storeId);
+
+  if (auditCount && auditCount > 0) {
+    return { data: null, error: "Cannot delete a store that has audits." };
   }
 
   const { error } = await supabase

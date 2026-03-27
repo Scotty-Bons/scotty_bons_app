@@ -1,30 +1,90 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  Package,
   Clock,
   CheckCircle,
-  DollarSign,
+  XCircle,
+  PackageCheck,
   ClipboardCheck,
-  BarChart3,
-  AlertTriangle,
-  TrendingUp,
-  ShoppingBasket,
-  Store,
+  ArrowRight,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/utils";
-import { STATUS_STYLES, STATUS_LABELS } from "@/lib/constants/order-status";
-import { getScoreColor, getScoreLabel } from "@/lib/constants/audit-status";
+import { STATUS_LABELS } from "@/lib/constants/order-status";
+import { getScoreColor } from "@/lib/constants/audit-status";
 import type { OrderStatus } from "@/lib/types";
+import { AuditScoreChart } from "@/components/dashboard/audit-score-chart";
+import type { AuditScoreDataPoint } from "@/components/dashboard/audit-score-chart";
+import { OrderValueChart } from "@/components/dashboard/order-value-chart";
+import type { OrderValueDataPoint } from "@/components/dashboard/order-value-chart";
+import {
+  TopProductsSection,
+  type ProductAggregate,
+  type CategoryAggregate,
+} from "@/components/dashboard/top-products-section";
 
 const ALL_STATUSES: OrderStatus[] = [
   "submitted",
   "approved",
   "declined",
   "fulfilled",
+];
+
+const STATUS_CARD_CONFIG: Record<
+  OrderStatus,
+  { icon: typeof Clock; color: string; hoverColor: string; bg: string; hoverBg: string; border: string; hoverBorder: string }
+> = {
+  submitted: {
+    icon: Clock,
+    color: "text-muted-foreground",
+    hoverColor: "group-hover:text-orange-600",
+    bg: "bg-muted/60",
+    hoverBg: "group-hover:bg-orange-50",
+    border: "border-l-gray-200",
+    hoverBorder: "hover:border-l-orange-500",
+  },
+  approved: {
+    icon: CheckCircle,
+    color: "text-muted-foreground",
+    hoverColor: "group-hover:text-emerald-600",
+    bg: "bg-muted/60",
+    hoverBg: "group-hover:bg-emerald-50",
+    border: "border-l-gray-200",
+    hoverBorder: "hover:border-l-emerald-500",
+  },
+  declined: {
+    icon: XCircle,
+    color: "text-muted-foreground",
+    hoverColor: "group-hover:text-red-600",
+    bg: "bg-muted/60",
+    hoverBg: "group-hover:bg-red-50",
+    border: "border-l-gray-200",
+    hoverBorder: "hover:border-l-red-500",
+  },
+  fulfilled: {
+    icon: PackageCheck,
+    color: "text-muted-foreground",
+    hoverColor: "group-hover:text-blue-600",
+    bg: "bg-muted/60",
+    hoverBg: "group-hover:bg-blue-50",
+    border: "border-l-gray-200",
+    hoverBorder: "hover:border-l-blue-500",
+  },
+};
+
+const STORE_PALETTE = [
+  "#3b82f6",
+  "#ef4444",
+  "#10b981",
+  "#f59e0b",
+  "#8b5cf6",
+  "#ec4899",
+  "#06b6d4",
+  "#84cc16",
+  "#f97316",
+  "#6366f1",
 ];
 
 export default async function DashboardPage() {
@@ -43,15 +103,18 @@ export default async function DashboardPage() {
 
   if (!profile || profile.role !== "admin") redirect("/orders");
 
-  // Fetch all data in parallel
+  // ── Fetch all data in parallel ──
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  const twelveMonthsAgoISO = twelveMonthsAgo.toISOString();
+
   const [
     ordersResult,
     itemsResult,
     storesResult,
     completedAuditsResult,
-    inProgressAuditsResult,
-    invoicesResult,
-    auditTemplatesResult,
+    productsResult,
+    categoriesResult,
   ] = await Promise.all([
     supabase
       .from("orders")
@@ -63,54 +126,58 @@ export default async function DashboardPage() {
     supabase.from("stores").select("id, name"),
     supabase
       .from("audits")
-      .select("id, store_id, template_id, score, conducted_at, created_at")
+      .select("id, store_id, score, conducted_at")
       .not("conducted_at", "is", null)
-      .order("conducted_at", { ascending: false }),
-    supabase
-      .from("audits")
-      .select("id", { count: "exact", head: true })
-      .is("conducted_at", null),
-    supabase
-      .from("invoices")
-      .select("id, store_id, grand_total, created_at"),
-    supabase
-      .from("audit_templates")
-      .select("id, name"),
+      .order("conducted_at", { ascending: true }),
+    supabase.from("products").select("id, name, modifier, category_id"),
+    supabase.from("product_categories").select("id, name"),
   ]);
 
   const orders = ordersResult.data ?? [];
-  const items = itemsResult.data ?? [];
+  const allItems = itemsResult.data ?? [];
   const stores = storesResult.data ?? [];
   const completedAudits = completedAuditsResult.data ?? [];
-  const inProgressCount = inProgressAuditsResult.count ?? 0;
-  const invoices = invoicesResult.data ?? [];
-  const auditTemplates = auditTemplatesResult.data ?? [];
+  const products = productsResult.data ?? [];
+  const categories = categoriesResult.data ?? [];
 
-  // Build store name map
+  // ── Maps ──
   const storeNameMap: Record<string, string> = {};
-  for (const store of stores) {
-    storeNameMap[store.id] = store.name;
+  for (const store of stores) storeNameMap[store.id] = store.name;
+
+  const sortedStoreNames = stores
+    .map((s) => s.name)
+    .sort((a, b) => a.localeCompare(b));
+
+  const storeColors: Record<string, string> = {};
+  sortedStoreNames.forEach((name, i) => {
+    storeColors[name] = STORE_PALETTE[i % STORE_PALETTE.length];
+  });
+
+  const categoryNameMap: Record<string, string> = {};
+  for (const cat of categories) categoryNameMap[cat.id] = cat.name;
+
+  // Product name+modifier → category name
+  const productCategoryMap: Record<string, string> = {};
+  for (const p of products) {
+    const key = `${p.name}|${p.modifier ?? ""}`;
+    productCategoryMap[key] = categoryNameMap[p.category_id] ?? "Uncategorized";
   }
 
-  // Build order totals map
+  // Order ID → store_id
+  const orderStoreMap: Record<string, string> = {};
+  for (const order of orders) orderStoreMap[order.id] = order.store_id;
+
+  // Order totals
   const orderTotals: Record<string, number> = {};
-  for (const item of items) {
+  for (const item of allItems) {
     orderTotals[item.order_id] =
       (orderTotals[item.order_id] ?? 0) +
       Number(item.unit_price) * item.quantity;
   }
 
-  // ── Order summary aggregates ──
-  const totalOrders = orders.length;
-  const pendingOrders = orders.filter(
-    (o) => o.status === "submitted",
-  ).length;
-  const approvedOrders = orders.filter((o) => o.status === "approved").length;
-  const totalRevenue = orders
-    .filter((o) => o.status === "approved" || o.status === "fulfilled")
-    .reduce((sum, o) => sum + (orderTotals[o.id] ?? 0), 0);
-
-  // Orders by status
+  // ══════════════════════════════════════════════
+  // 1. ORDER STATUS COUNTS
+  // ══════════════════════════════════════════════
   const statusCounts: Record<OrderStatus, number> = {
     submitted: 0,
     approved: 0,
@@ -122,558 +189,347 @@ export default async function DashboardPage() {
     if (s in statusCounts) statusCounts[s]++;
   }
 
-  // Orders by store
-  const storeAgg: Record<string, { count: number; total: number }> = {};
-  for (const order of orders) {
-    const existing = storeAgg[order.store_id] ?? { count: 0, total: 0 };
-    existing.count++;
-    existing.total += orderTotals[order.id] ?? 0;
-    storeAgg[order.store_id] = existing;
+  // ══════════════════════════════════════════════
+  // 2. AUDIT SCORE CHART DATA (time series per store)
+  // ══════════════════════════════════════════════
+  const auditByMonthStore: Record<
+    string,
+    Record<string, { sum: number; count: number }>
+  > = {};
+
+  for (const audit of completedAudits) {
+    if (!audit.conducted_at || audit.score === null) continue;
+    const d = new Date(audit.conducted_at);
+    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const storeName = storeNameMap[audit.store_id] ?? "Unknown";
+
+    if (!auditByMonthStore[monthKey]) auditByMonthStore[monthKey] = {};
+    const entry = auditByMonthStore[monthKey][storeName] ?? {
+      sum: 0,
+      count: 0,
+    };
+    entry.sum += audit.score;
+    entry.count++;
+    auditByMonthStore[monthKey][storeName] = entry;
   }
 
-  // Recent orders (first 5)
-  const recentOrders = orders.slice(0, 5);
+  const auditChartData: AuditScoreDataPoint[] = Object.keys(auditByMonthStore)
+    .sort()
+    .map((monthKey) => {
+      const [y, m] = monthKey.split("-");
+      const label = new Intl.DateTimeFormat("en-CA", {
+        year: "numeric",
+        month: "short",
+      }).format(new Date(Number(y), Number(m) - 1));
 
-  // ── Compliance aggregates (Story 7-1) ──
-  const totalCompletedAudits = completedAudits.length;
-  const avgScore =
-    totalCompletedAudits > 0
-      ? completedAudits.reduce((sum, a) => sum + (a.score ?? 0), 0) /
-        totalCompletedAudits
-      : 0;
+      const point: AuditScoreDataPoint = { date: label };
+      const monthData = auditByMonthStore[monthKey];
+      for (const storeName of sortedStoreNames) {
+        const entry = monthData[storeName];
+        if (entry) {
+          point[storeName] = Math.round((entry.sum / entry.count) * 100) / 100;
+        }
+      }
+      return point;
+    });
 
-  // Per-store compliance
-  const storeCompliance: Record<
+  // ══════════════════════════════════════════════
+  // 3. AUDIT RANKING
+  // ══════════════════════════════════════════════
+  const storeAuditAgg: Record<
     string,
-    { count: number; totalScore: number; lastDate: string }
+    { totalScore: number; count: number; lastDate: string }
   > = {};
   for (const audit of completedAudits) {
-    const existing = storeCompliance[audit.store_id] ?? {
-      count: 0,
+    if (audit.score === null) continue;
+    const storeName = storeNameMap[audit.store_id] ?? "Unknown";
+    const existing = storeAuditAgg[storeName] ?? {
       totalScore: 0,
+      count: 0,
       lastDate: "",
     };
+    existing.totalScore += audit.score;
     existing.count++;
-    existing.totalScore += audit.score ?? 0;
     if (audit.conducted_at && audit.conducted_at > existing.lastDate) {
       existing.lastDate = audit.conducted_at;
     }
-    storeCompliance[audit.store_id] = existing;
+    storeAuditAgg[storeName] = existing;
   }
 
-  const storesBelow70 = Object.values(storeCompliance).filter(
-    (s) => s.count > 0 && s.totalScore / s.count < 70,
-  ).length;
+  const auditRanking = Object.entries(storeAuditAgg)
+    .map(([storeName, data]) => {
+      const avgScore = data.totalScore / data.count;
+      const lastDate = data.lastDate ? new Date(data.lastDate) : null;
+      const daysSince = lastDate
+        ? Math.floor(
+            (Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24),
+          )
+        : null;
+      return { storeName, avgScore, count: data.count, lastDate: data.lastDate, daysSince };
+    })
+    .sort((a, b) => b.avgScore - a.avgScore);
 
-  // Sort stores by avg score ascending (worst first)
-  const complianceSorted = Object.entries(storeCompliance)
-    .map(([storeId, data]) => ({
-      storeId,
-      storeName: storeNameMap[storeId] ?? storeId.slice(0, 8),
-      count: data.count,
-      avgScore: data.totalScore / data.count,
-      lastDate: data.lastDate,
-    }))
-    .sort((a, b) => a.avgScore - b.avgScore);
+  // ══════════════════════════════════════════════
+  // 4. ORDER VALUE CHART (last 12 months, per store)
+  // ══════════════════════════════════════════════
+  const recentOrders = orders.filter(
+    (o) => o.created_at >= twelveMonthsAgoISO,
+  );
 
-  // Build template name map from parallel fetch
-  const templateNameMap: Record<string, string> = {};
-  for (const t of auditTemplates) {
-    templateNameMap[t.id] = t.name;
+  const orderValueByMonthStore: Record<string, Record<string, number>> = {};
+  for (const order of recentOrders) {
+    const d = new Date(order.created_at);
+    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const storeName = storeNameMap[order.store_id] ?? "Unknown";
+
+    if (!orderValueByMonthStore[monthKey])
+      orderValueByMonthStore[monthKey] = {};
+    orderValueByMonthStore[monthKey][storeName] =
+      (orderValueByMonthStore[monthKey][storeName] ?? 0) +
+      (orderTotals[order.id] ?? 0);
   }
 
-  const recentAudits = completedAudits.slice(0, 5);
+  // Generate all 12 months even if empty
+  const orderValueChartData: OrderValueDataPoint[] = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = new Intl.DateTimeFormat("en-CA", {
+      year: "numeric",
+      month: "short",
+    }).format(d);
 
-  // ── Analytics aggregates (Story 7-2) ──
-  // Monthly summary (last 6 months)
-  const monthlyData: Record<string, { count: number; total: number }> = {};
-  for (const order of orders) {
-    const date = new Date(order.created_at);
-    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-    const existing = monthlyData[key] ?? { count: 0, total: 0 };
-    existing.count++;
-    existing.total += orderTotals[order.id] ?? 0;
-    monthlyData[key] = existing;
+    const point: OrderValueDataPoint = { month: label };
+    const monthData = orderValueByMonthStore[monthKey] ?? {};
+    for (const storeName of sortedStoreNames) {
+      point[storeName] = monthData[storeName] ?? 0;
+    }
+    orderValueChartData.push(point);
   }
-  const monthlySorted = Object.entries(monthlyData)
-    .sort(([a], [b]) => b.localeCompare(a))
-    .slice(0, 6);
 
-  // Top stores by invoice revenue
-  const storeRevenue: Record<string, { count: number; total: number }> = {};
-  for (const invoice of invoices) {
-    const existing = storeRevenue[invoice.store_id] ?? {
-      count: 0,
-      total: 0,
-    };
-    existing.count++;
-    existing.total += Number(invoice.grand_total);
-    storeRevenue[invoice.store_id] = existing;
-  }
-  const topStores = Object.entries(storeRevenue)
-    .sort(([, a], [, b]) => b.total - a.total)
-    .slice(0, 5);
-
-  // Popular products
-  const productQty: Record<
+  // ══════════════════════════════════════════════
+  // 5. TOP CATEGORIES & PRODUCTS (by store + "all")
+  // ══════════════════════════════════════════════
+  const productAgg: Record<
     string,
-    { name: string; modifier: string; total: number }
-  > = {};
-  for (const item of items) {
-    const key = `${item.product_name}|${item.modifier}`;
-    const existing = productQty[key] ?? {
-      name: item.product_name,
-      modifier: item.modifier,
-      total: 0,
-    };
-    existing.total += item.quantity;
-    productQty[key] = existing;
+    Record<string, { name: string; modifier: string; quantity: number; value: number }>
+  > = { all: {} };
+  const categoryAgg: Record<
+    string,
+    Record<string, { name: string; quantity: number; value: number }>
+  > = { all: {} };
+
+  for (const store of stores) {
+    productAgg[store.id] = {};
+    categoryAgg[store.id] = {};
   }
-  const topProducts = Object.values(productQty)
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 10);
+
+  for (const item of allItems) {
+    const storeId = orderStoreMap[item.order_id];
+    if (!storeId) continue;
+
+    const productKey = `${item.product_name}|${item.modifier}`;
+    const catName =
+      productCategoryMap[productKey] ?? "Uncategorized";
+    const lineValue = Number(item.unit_price) * item.quantity;
+
+    // Aggregate for "all" and for the specific store
+    for (const bucket of ["all", storeId]) {
+      if (!productAgg[bucket]) productAgg[bucket] = {};
+      if (!categoryAgg[bucket]) categoryAgg[bucket] = {};
+
+      // Products
+      const pEntry = productAgg[bucket][productKey] ?? {
+        name: item.product_name,
+        modifier: item.modifier,
+        quantity: 0,
+        value: 0,
+      };
+      pEntry.quantity += item.quantity;
+      pEntry.value += lineValue;
+      productAgg[bucket][productKey] = pEntry;
+
+      // Categories
+      const cEntry = categoryAgg[bucket][catName] ?? {
+        name: catName,
+        quantity: 0,
+        value: 0,
+      };
+      cEntry.quantity += item.quantity;
+      cEntry.value += lineValue;
+      categoryAgg[bucket][catName] = cEntry;
+    }
+  }
+
+  // Convert to sorted arrays, top 10
+  const productsByStore: Record<string, ProductAggregate[]> = {};
+  const categoriesByStore: Record<string, CategoryAggregate[]> = {};
+
+  for (const key of Object.keys(productAgg)) {
+    productsByStore[key] = Object.values(productAgg[key])
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 10);
+  }
+  for (const key of Object.keys(categoryAgg)) {
+    categoriesByStore[key] = Object.values(categoryAgg[key])
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 10);
+  }
 
   // ── Formatting helpers ──
   const dateFmt = new Intl.DateTimeFormat("en-CA", { dateStyle: "medium" });
-  const monthFmt = new Intl.DateTimeFormat("en-CA", {
-    year: "numeric",
-    month: "long",
-  });
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-8">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
-
-      {/* ── Order Summary Cards ── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-            <Package className="size-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalOrders}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Pending Orders
-            </CardTitle>
-            <Clock className="size-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pendingOrders}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Approved Orders
-            </CardTitle>
-            <CheckCircle className="size-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{approvedOrders}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Revenue
-            </CardTitle>
-            <DollarSign className="size-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatPrice(totalRevenue)}
-            </div>
-          </CardContent>
-        </Card>
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* ── Header ── */}
+      <div>
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <p className="text-sm text-muted-foreground">
+          {dateFmt.format(new Date())}
+        </p>
       </div>
 
-      {/* ── Orders by Status ── */}
-      <div>
-        <h2 className="text-lg font-semibold mb-3">Orders by Status</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {ALL_STATUSES.map((status) => (
-            <Card key={status}>
-              <CardContent className="p-4 flex items-center gap-3">
-                <Badge variant="status" style={STATUS_STYLES[status]}>
+      {/* ══ 1. Order Status Cards ══ */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        {ALL_STATUSES.map((status) => {
+          const config = STATUS_CARD_CONFIG[status];
+          const Icon = config.icon;
+          const count = statusCounts[status];
+          return (
+            <Card
+              key={status}
+              className={`group border-l-4 ${config.border} ${config.hoverBorder} hover:shadow-md transition-all`}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`rounded-full ${config.bg} ${config.hoverBg} p-2.5 transition-colors`}>
+                    <Icon className={`size-4 ${config.color} ${config.hoverColor} transition-colors`} />
+                  </div>
+                  <span className="text-3xl font-bold tabular-nums">
+                    {count}
+                  </span>
+                </div>
+                <p className="text-sm font-medium text-muted-foreground">
                   {STATUS_LABELS[status]}
-                </Badge>
-                <span className="text-xl font-bold ml-auto">
-                  {statusCounts[status]}
-                </span>
+                </p>
+                <Link
+                  href={`/orders?status=${status}`}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground font-medium mt-2 group-hover:text-primary hover:underline transition-colors"
+                >
+                  View orders <ArrowRight className="size-3" />
+                </Link>
               </CardContent>
             </Card>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
-      {/* ── Orders by Store ── */}
-      {Object.keys(storeAgg).length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Orders by Store</h2>
-          <Card>
-            <div className="divide-y">
-              {Object.entries(storeAgg)
-                .sort(([, a], [, b]) => b.count - a.count)
-                .map(([storeId, agg]) => (
-                  <div
-                    key={storeId}
-                    className="flex items-center justify-between px-4 py-3"
-                  >
-                    <span className="text-sm font-medium">
-                      {storeNameMap[storeId] ?? storeId.slice(0, 8)}
-                    </span>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-muted-foreground">
-                        {agg.count} {agg.count === 1 ? "order" : "orders"}
-                      </span>
-                      <span className="font-medium">
-                        {formatPrice(agg.total)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </Card>
-        </div>
-      )}
+      {/* ══ 2. Audit Score Over Time ══ */}
+      <AuditScoreChart
+        data={auditChartData}
+        storeNames={sortedStoreNames}
+        colors={storeColors}
+      />
 
-      {/* ── Recent Orders ── */}
-      <div>
-        <h2 className="text-lg font-semibold mb-3">Recent Orders</h2>
-        {recentOrders.length === 0 ? (
-          <Card>
-            <CardContent className="p-6 text-center text-sm text-muted-foreground">
-              No orders yet.
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <div className="divide-y">
-              {recentOrders.map((order) => {
-                const status = order.status as OrderStatus;
-                return (
-                  <Link
-                    key={order.id}
-                    href={`/orders/${order.id}`}
-                    className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">
-                        {order.order_number}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {dateFmt.format(new Date(order.created_at))}
-                        {storeNameMap[order.store_id]
-                          ? ` · ${storeNameMap[order.store_id]}`
-                          : ""}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-sm font-medium">
-                        {formatPrice(orderTotals[order.id] ?? 0)}
-                      </span>
-                      <Badge variant="status" style={STATUS_STYLES[status]}>
-                        {STATUS_LABELS[status]}
-                      </Badge>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </Card>
-        )}
-      </div>
-
-      {/* ── Compliance Overview (Story 7-1) ── */}
-      <div>
-        <h2 className="text-lg font-semibold mb-3">Compliance Overview</h2>
-
-        {totalCompletedAudits === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <ClipboardCheck className="mx-auto size-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No audits yet</h3>
+      {/* ══ 3. Audit Ranking ══ */}
+      <Card>
+        <CardContent className="p-5">
+          <h2 className="text-lg font-semibold mb-4">Audit Ranking</h2>
+          {auditRanking.length === 0 ? (
+            <div className="text-center py-8">
+              <ClipboardCheck className="mx-auto size-10 text-muted-foreground/40 mb-2" />
               <p className="text-sm text-muted-foreground">
-                No audits have been conducted yet.
+                No completed audits yet.
               </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            {/* Compliance summary cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Total Audits
-                  </CardTitle>
-                  <ClipboardCheck className="size-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {totalCompletedAudits}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Average Score
-                  </CardTitle>
-                  <BarChart3 className="size-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {avgScore.toFixed(1)}%
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    In Progress
-                  </CardTitle>
-                  <Clock className="size-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{inProgressCount}</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Stores Below 70%
-                  </CardTitle>
-                  <AlertTriangle className="size-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{storesBelow70}</div>
-                </CardContent>
-              </Card>
             </div>
-
-            {/* Compliance by Store */}
-            {complianceSorted.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-md font-semibold mb-2">
-                  Compliance by Store
-                </h3>
-                <Card>
-                  <div className="divide-y">
-                    {complianceSorted.map((row) => (
-                      <div
-                        key={row.storeId}
-                        className="flex items-center justify-between px-4 py-3"
-                      >
-                        <span className="text-sm font-medium">
-                          {row.storeName}
-                        </span>
-                        <div className="flex items-center gap-4 text-sm">
-                          <span className="text-muted-foreground">
-                            {row.count}{" "}
-                            {row.count === 1 ? "audit" : "audits"}
-                          </span>
-                          <span
-                            className={`font-medium px-2 py-0.5 rounded border ${getScoreColor(row.avgScore)}`}
-                          >
-                            {row.avgScore.toFixed(1)}% —{" "}
-                            {getScoreLabel(row.avgScore)}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            Last: {dateFmt.format(new Date(row.lastDate))}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              </div>
-            )}
-
-            {/* Recent Completed Audits */}
-            <div>
-              <h3 className="text-md font-semibold mb-2">Recent Audits</h3>
-              <Card>
-                <div className="divide-y">
-                  {recentAudits.map((audit) => (
-                    <Link
-                      key={audit.id}
-                      href={`/audits/${audit.id}`}
-                      className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">
-                          {templateNameMap[audit.template_id] ?? "Audit"} —{" "}
-                          {storeNameMap[audit.store_id] ?? "Unknown Store"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {audit.conducted_at
-                            ? dateFmt.format(new Date(audit.conducted_at))
-                            : ""}
-                        </p>
-                      </div>
-                      {audit.score !== null && (
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="pb-2 font-medium w-12">#</th>
+                    <th className="pb-2 font-medium">Store</th>
+                    <th className="pb-2 font-medium text-center">Audits</th>
+                    <th className="pb-2 font-medium text-center">Avg Score</th>
+                    <th className="pb-2 font-medium text-right">Last Audit</th>
+                    <th className="pb-2 font-medium text-right">
+                      Days Since
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {auditRanking.map((row, idx) => (
+                    <tr key={row.storeName}>
+                      <td className="py-2.5">
                         <span
-                          className={`text-sm font-medium px-2 py-0.5 rounded border shrink-0 ${getScoreColor(audit.score)}`}
+                          className={`flex items-center justify-center size-7 rounded-full text-xs font-bold ${
+                            idx === 0
+                              ? "bg-primary text-white"
+                              : "bg-muted text-muted-foreground"
+                          }`}
                         >
-                          {audit.score}% — {getScoreLabel(audit.score)}
+                          {idx + 1}
                         </span>
-                      )}
-                    </Link>
-                  ))}
-                </div>
-              </Card>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* ── Order Analytics (Story 7-2) ── */}
-      {orders.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Order Analytics</h2>
-
-          {/* Monthly Summary */}
-          {monthlySorted.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-md font-semibold mb-2">Monthly Summary</h3>
-              <Card>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left">
-                        <th className="px-4 py-3 font-medium">Month</th>
-                        <th className="px-4 py-3 font-medium text-right">
-                          Orders
-                        </th>
-                        <th className="px-4 py-3 font-medium text-right">
-                          Revenue
-                        </th>
-                        <th className="px-4 py-3 font-medium text-right">
-                          Avg Order Value
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {monthlySorted.map(([key, data]) => {
-                        const [year, month] = key.split("-");
-                        const monthDate = new Date(
-                          Number(year),
-                          Number(month) - 1,
-                        );
-                        const avg =
-                          data.count > 0 ? data.total / data.count : 0;
-                        return (
-                          <tr key={key}>
-                            <td className="px-4 py-3">
-                              {monthFmt.format(monthDate)}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {data.count}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {formatPrice(data.total)}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {formatPrice(avg)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {/* Top Stores by Revenue */}
-          {topStores.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-md font-semibold mb-2">
-                Top Stores by Revenue
-              </h3>
-              <Card>
-                <div className="divide-y">
-                  {topStores.map(([storeId, data], idx) => (
-                    <div
-                      key={storeId}
-                      className="flex items-center justify-between px-4 py-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground w-5">
-                          #{idx + 1}
-                        </span>
-                        <Store className="size-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">
-                          {storeNameMap[storeId] ?? storeId.slice(0, 8)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm">
-                        <span className="text-muted-foreground">
-                          {data.count}{" "}
-                          {data.count === 1 ? "invoice" : "invoices"}
-                        </span>
-                        <span className="font-medium">
-                          {formatPrice(data.total)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {/* Popular Products */}
-          {topProducts.length > 0 && (
-            <div>
-              <h3 className="text-md font-semibold mb-2">Popular Products</h3>
-              <Card>
-                <div className="divide-y">
-                  {topProducts.map((product, idx) => (
-                    <div
-                      key={`${product.name}|${product.modifier}`}
-                      className="flex items-center justify-between px-4 py-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground w-5">
-                          #{idx + 1}
-                        </span>
-                        <ShoppingBasket className="size-4 text-muted-foreground" />
-                        <div>
-                          <span className="text-sm font-medium">
-                            {product.name}
+                      </td>
+                      <td className="py-2.5 font-medium">{row.storeName}</td>
+                      <td className="py-2.5 text-center text-muted-foreground">
+                        {row.count}
+                      </td>
+                      <td className="py-2.5 text-center">
+                        <Badge
+                          variant="outline"
+                          className={getScoreColor(row.avgScore)}
+                        >
+                          {row.avgScore.toFixed(1)}%
+                        </Badge>
+                      </td>
+                      <td className="py-2.5 text-right text-muted-foreground">
+                        {row.lastDate
+                          ? dateFmt.format(new Date(row.lastDate))
+                          : "—"}
+                      </td>
+                      <td className="py-2.5 text-right">
+                        {row.daysSince !== null ? (
+                          <span
+                            className={
+                              row.daysSince > 30
+                                ? "text-red-500/80 font-medium"
+                                : row.daysSince > 14
+                                  ? "text-amber-500/80 font-medium"
+                                  : "text-muted-foreground"
+                            }
+                          >
+                            {row.daysSince}d
                           </span>
-                          {product.modifier && (
-                            <span className="text-xs text-muted-foreground ml-2">
-                              ({product.modifier})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium">
-                        {product.total} units
-                      </span>
-                    </div>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
                   ))}
-                </div>
-              </Card>
+                </tbody>
+              </table>
             </div>
           )}
-        </div>
-      )}
+        </CardContent>
+      </Card>
+
+      {/* ══ 4. Monthly Order Value ══ */}
+      <OrderValueChart
+        data={orderValueChartData}
+        storeNames={sortedStoreNames}
+        colors={storeColors}
+      />
+
+      {/* ══ 5. Top Categories & Products ══ */}
+      <TopProductsSection
+        stores={stores
+          .map((s) => ({ id: s.id, name: s.name }))
+          .sort((a, b) => a.name.localeCompare(b.name))}
+        productsByStore={productsByStore}
+        categoriesByStore={categoriesByStore}
+      />
     </div>
   );
 }

@@ -31,6 +31,7 @@ export default async function NewOrderPage() {
     supabase
       .from("products")
       .select("id, name, price, modifier, category_id, image_url")
+      .eq("active", true)
       .order("name"),
   ]);
 
@@ -50,7 +51,7 @@ export default async function NewOrderPage() {
   }));
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       <div>
         <p className="text-sm text-muted-foreground">
           Orders &gt; New Order

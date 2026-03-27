@@ -128,7 +128,7 @@ export default async function AuditDetailPage({
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Breadcrumb */}
       <nav aria-label="Breadcrumb" className="text-sm flex items-center gap-1.5">
         <Link

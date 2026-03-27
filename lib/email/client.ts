@@ -13,18 +13,21 @@ export async function sendEmail({
   subject: string;
   html: string;
 }): Promise<void> {
+  console.log("[email] sendEmail called:", { to, subject, hasResend: !!resend });
+
   if (!resend) {
     console.warn("[email] RESEND_API_KEY not configured, skipping email.");
     return;
   }
 
   try {
-    await resend.emails.send({
+    const result = await resend.emails.send({
       from: `Scotty Ops <${process.env.RESEND_FROM_EMAIL ?? "notifications@resend.dev"}>`,
       to: Array.isArray(to) ? to : [to],
       subject,
       html,
     });
+    console.log("[email] Sent successfully:", result);
   } catch (error) {
     console.error("[email] Failed to send:", error);
   }

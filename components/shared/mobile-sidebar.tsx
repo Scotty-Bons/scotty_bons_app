@@ -36,33 +36,33 @@ export function MobileSidebar({ role }: MobileSidebarProps) {
         <span className="sr-only">Open menu</span>
       </Button>
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="left" className="w-64 p-0">
-          <SheetHeader className="border-b px-5 h-14 flex justify-center">
+        <SheetContent side="left" className="w-72 p-0 bg-white dark:bg-card">
+          <SheetHeader className="border-b border-gray-100 dark:border-border px-5 h-16 flex justify-center">
             <SheetTitle className="flex items-center">
               <Image
                 src="/logo_scottybons.png"
                 alt="ScottyBons"
-                width={140}
-                height={32}
+                width={150}
+                height={34}
               />
             </SheetTitle>
           </SheetHeader>
-          <nav className="flex flex-col gap-0.5 p-3 pt-4">
+          <nav className="flex flex-col gap-1 p-3 pt-5">
             {navItems.map(({ href, label, icon: Icon }) => {
-              const isActive = pathname === href;
+              const isActive = pathname === href || pathname.startsWith(href + "/");
               return (
                 <Link
                   key={href}
                   href={href}
                   onClick={() => setOpen(false)}
                   className={cn(
-                    "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-primary/20 text-foreground font-semibold"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      ? "bg-primary-light text-primary font-semibold dark:bg-primary/20"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-foreground dark:text-muted-foreground dark:hover:bg-muted"
                   )}
                 >
-                  <Icon className={cn("size-4", isActive && "text-primary")} />
+                  <Icon className={cn("size-5", isActive ? "text-primary" : "text-gray-400 dark:text-muted-foreground")} />
                   {label}
                 </Link>
               );

@@ -46,7 +46,7 @@ export default async function InvoiceDetailPage({
   const adFee = Number(invoice.ad_royalties_fee ?? 0);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Breadcrumb */}
       <nav
         aria-label="Breadcrumb"
@@ -165,6 +165,12 @@ export default async function InvoiceDetailPage({
               <span className="text-muted-foreground">Subtotal</span>
               <span>{formatPrice(Number(invoice.subtotal))}</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">
+                HST ({taxRatePercent.toFixed(2)}%)
+              </span>
+              <span>{formatPrice(Number(invoice.tax_amount))}</span>
+            </div>
             {adFee > 0 && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
@@ -173,12 +179,6 @@ export default async function InvoiceDetailPage({
                 <span>{formatPrice(adFee)}</span>
               </div>
             )}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                HST ({taxRatePercent.toFixed(2)}%)
-              </span>
-              <span>{formatPrice(Number(invoice.tax_amount))}</span>
-            </div>
             <div className="flex justify-between border-t pt-2 text-base font-bold">
               <span>Grand Total</span>
               <span>{formatPrice(Number(invoice.grand_total))}</span>

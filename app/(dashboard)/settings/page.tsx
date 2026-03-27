@@ -34,8 +34,8 @@ export default async function SettingsPage() {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-8">
-      <h1 className="text-2xl font-bold">Settings</h1>
+    <div className="max-w-2xl mx-auto space-y-8">
+      <h1 className="text-xl font-bold">Settings</h1>
 
       <section className="space-y-6">
         <h2 className="text-lg font-semibold">Account</h2>

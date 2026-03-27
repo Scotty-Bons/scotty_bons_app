@@ -60,10 +60,10 @@ export function AuditFilters({ role, stores }: AuditFiltersProps) {
           value={currentStatus || "all"}
           onValueChange={(v) => updateParams({ status: v === "all" ? "" : v })}
         >
-          <SelectTrigger>
+          <SelectTrigger className="rounded-xl h-10">
             <SelectValue placeholder="All" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="rounded-xl">
             <SelectItem value="all">All</SelectItem>
             <SelectItem value="in_progress">In Progress</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
@@ -82,10 +82,10 @@ export function AuditFilters({ role, stores }: AuditFiltersProps) {
               updateParams({ store_id: v === "all" ? "" : v })
             }
           >
-            <SelectTrigger>
+            <SelectTrigger className="rounded-xl h-10">
               <SelectValue placeholder="All stores" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-xl">
               <SelectItem value="all">All stores</SelectItem>
               {stores.map((store) => (
                 <SelectItem key={store.id} value={store.id}>

@@ -130,7 +130,7 @@ export default async function OrderDetailPage({
     }).format(new Date(timestamp));
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Breadcrumb */}
       <nav
         aria-label="Breadcrumb"
@@ -148,26 +148,29 @@ export default async function OrderDetailPage({
       </nav>
 
       {/* Order header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{order.order_number}</h1>
+      <div className="space-y-4">
         <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">{order.order_number}</h1>
           <Badge variant="status" style={STATUS_STYLES[status]}>{STATUS_LABELS[status]}</Badge>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Primary workflow actions */}
           <OrderStatusActions
             orderId={order.id}
             currentStatus={status}
             role={profile.role}
           />
-          <EditOrderButton
-            orderId={order.id}
-            currentStatus={status}
-            role={profile.role}
-          />
-          <DeleteOrderButton
-            orderId={order.id}
-            currentStatus={status}
-            role={profile.role}
-          />
           <FulfillOrderButton
+            orderId={order.id}
+            currentStatus={status}
+            role={profile.role}
+          />
+
+          {/* Secondary actions — separated visually */}
+          <div className="h-6 w-px bg-border mx-1 hidden sm:block" />
+
+          <EditOrderButton
             orderId={order.id}
             currentStatus={status}
             role={profile.role}
@@ -190,6 +193,15 @@ export default async function OrderDetailPage({
               </Button>
             </Link>
           )}
+
+          {/* Destructive action — pushed to the end */}
+          <div className="sm:ml-auto">
+            <DeleteOrderButton
+              orderId={order.id}
+              currentStatus={status}
+              role={profile.role}
+            />
+          </div>
         </div>
       </div>
 

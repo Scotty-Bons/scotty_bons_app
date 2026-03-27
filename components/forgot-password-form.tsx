@@ -3,17 +3,11 @@
 import { cn } from "@/lib/utils";
 import { requestPasswordReset } from "@/app/(auth)/forgot-password/actions";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { Mail, CheckCircle } from "lucide-react";
 
 export function ForgotPasswordForm({
   className,
@@ -40,55 +34,56 @@ export function ForgotPasswordForm({
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       {success ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">Check your email</CardTitle>
-            <CardDescription>Password reset link sent</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              If that email is registered, you will receive a reset link
-              shortly.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="flex size-16 items-center justify-center rounded-full bg-primary-light">
+            <CheckCircle className="size-8 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground">Check your email</h1>
+          <p className="text-sm text-muted-foreground">
+            If that email is registered, you will receive a reset link shortly.
+          </p>
+          <Link href="/login">
+            <Button variant="outline" className="mt-2">
+              Back to login
+            </Button>
+          </Link>
+        </div>
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">Reset Password</CardTitle>
-            <CardDescription>
-              Enter your email and we will send you a reset link
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit}>
-              <div className="flex flex-col gap-6">
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="your@email.com"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                {error && (
-                  <p className="text-sm text-destructive">{error}</p>
-                )}
-                <Button type="submit" className="w-full" disabled={isPending}>
-                  {isPending ? "Sending..." : "Send reset link"}
-                </Button>
-              </div>
-              <div className="mt-4 text-center text-sm">
-                <Link href="/login" className="underline underline-offset-4">
-                  Remember your password? Sign in
-                </Link>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+        <>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Reset Password</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Enter your email and we will send you a reset link.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <div className="grid gap-2">
+              <Label htmlFor="email" className="text-sm font-medium text-muted-foreground">
+                E-mail
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="your@email.com"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                leftIcon={<Mail className="size-5" />}
+              />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button type="submit" size="lg" className="w-full" disabled={isPending}>
+              {isPending ? "Sending..." : "Send reset link"}
+            </Button>
+          </form>
+
+          <p className="text-center text-sm text-muted-foreground">
+            <Link href="/login" className="font-semibold text-primary hover:text-primary/80">
+              Back to login
+            </Link>
+          </p>
+        </>
       )}
     </div>
   );

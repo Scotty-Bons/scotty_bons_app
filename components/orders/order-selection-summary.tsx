@@ -132,14 +132,6 @@ export function OrderSelectableList({
         </div>
       )}
 
-      {children({
-        isSelected: (id) => selected.has(id),
-        toggleSelection,
-        selectAll,
-        clearAll,
-        selectedCount: selected.size,
-      })}
-
       {aggregated.length > 0 && (
         <Card>
           <CardHeader>
@@ -191,6 +183,14 @@ export function OrderSelectableList({
           </CardContent>
         </Card>
       )}
+
+      {children({
+        isSelected: (id) => selected.has(id),
+        toggleSelection,
+        selectAll,
+        clearAll,
+        selectedCount: selected.size,
+      })}
     </div>
   );
 }

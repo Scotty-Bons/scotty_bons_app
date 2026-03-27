@@ -14,6 +14,6 @@ export const allNavItems: NavItem[] = [
   { href: "/invoices", label: "Invoices", icon: FileText, roles: ["admin", "commissary", "store"] },
   { href: "/audits", label: "Audits", icon: ClipboardCheck, roles: ["admin", "commissary", "store"] },
   { href: "/products", label: "Products", icon: ShoppingBasket, roles: ["admin", "store"] },
-  { href: "/users", label: "Users", icon: Users, roles: ["admin"] },
+  { href: "/users", label: "Users & Stores", icon: Users, roles: ["admin"] },
   { href: "/settings", label: "Settings", icon: Settings, roles: ["admin", "commissary", "store"] },
 ];

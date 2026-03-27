@@ -56,6 +56,7 @@ export async function createOrder(
   const { data: orderId, error } = await supabase.rpc(
     "create_order_with_items",
     {
+      p_store_id: parsed.data.store_id,
       p_items: parsed.data.items.map((item) => ({
         product_id: item.product_id,
         quantity: item.quantity,
@@ -79,28 +80,29 @@ export async function createOrder(
 
   revalidatePath("/orders");
 
-  // Fire-and-forget: notify admins about new order
-  (async () => {
-    try {
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("store_id")
-        .eq("user_id", user.id)
-        .single();
-      if (profileData?.store_id) {
-        const [{ data: storeData }, { data: orderData }] = await Promise.all([
-          supabase.from("stores").select("name").eq("id", profileData.store_id).single(),
-          supabase.from("orders").select("order_number").eq("id", orderId).single(),
-        ]);
-        await notifyOrderSubmitted(
-          orderId,
-          orderData?.order_number ?? orderId.slice(0, 8),
-          storeData?.name ?? "Unknown Store",
-          parsed.data.items.length,
-        );
-      }
-    } catch { /* ignore notification errors */ }
-  })();
+  // Notify admins about new order (awaited so it completes before response)
+  try {
+    const { data: profileData, error: profileError } = await supabase
+      .from("profiles")
+      .select("store_id")
+      .eq("user_id", user.id)
+      .single();
+    console.log("[email] profile lookup:", { profileData, profileError });
+    if (profileData?.store_id) {
+      const [{ data: storeData }, { data: orderData }] = await Promise.all([
+        supabase.from("stores").select("name").eq("id", profileData.store_id).single(),
+        supabase.from("orders").select("order_number").eq("id", orderId).single(),
+      ]);
+      await notifyOrderSubmitted(
+        orderId,
+        orderData?.order_number ?? orderId.slice(0, 8),
+        storeData?.name ?? "Unknown Store",
+        parsed.data.items.length,
+      );
+    }
+  } catch (e) {
+    console.error("[email] Failed to notify order submitted:", e);
+  }
 
   return { data: { id: orderId }, error: null };
 }

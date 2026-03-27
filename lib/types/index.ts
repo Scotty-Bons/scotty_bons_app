@@ -22,7 +22,6 @@ export type StoreRow = {
   address?: string;
   postal_code?: string;
   phone?: string;
-  email?: string;
 };
 
 export type CategoryRow = {

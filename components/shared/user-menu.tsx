@@ -39,30 +39,33 @@ export function UserMenu({ userName, userEmail }: UserMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className="rounded-full bg-primary text-primary-foreground size-8 text-xs font-medium p-0 hover:bg-primary/90"
-        >
-          {initials}
-        </Button>
+        <button className="flex items-center gap-2.5 rounded-full px-1 py-1 hover:bg-gray-50 dark:hover:bg-muted transition-colors outline-none">
+          <span className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold">
+            {initials}
+          </span>
+          <div className="hidden sm:flex flex-col items-start">
+            <span className="text-sm font-semibold text-foreground leading-tight">{userName}</span>
+            <span className="text-xs text-muted-foreground leading-tight">{userEmail}</span>
+          </div>
+        </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="w-56 rounded-xl">
         <DropdownMenuLabel>
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium">{userName}</p>
+            <p className="text-sm font-semibold">{userName}</p>
             <p className="text-xs text-muted-foreground">{userEmail}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
+        <DropdownMenuItem asChild className="rounded-lg">
           <Link href="/settings">
             <Settings className="size-4 mr-2" />
             Settings
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleSignOut}>
+        <DropdownMenuItem onClick={handleSignOut} className="rounded-lg text-primary focus:text-primary">
           <LogOut className="size-4 mr-2" />
-          Sign out
+          Logout
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

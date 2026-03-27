@@ -12,7 +12,7 @@ interface HeaderProps {
 
 export function Header({ role, userName, userEmail }: HeaderProps) {
   return (
-    <header className="h-14 border-b flex items-center justify-between px-4 shrink-0">
+    <header className="sticky top-0 z-30 h-16 border-b border-gray-100 dark:border-border bg-white dark:bg-card flex items-center justify-between px-4 sm:px-6 shrink-0">
       <div className="flex items-center gap-3">
         <MobileSidebar role={role} />
         <Breadcrumbs />

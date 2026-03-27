@@ -69,12 +69,12 @@ export default async function UsersPage({
   // Fetch all stores for the dropdowns — use adminClient to bypass RLS on stores table
   const { data: stores } = await adminClient
     .from("stores")
-    .select("id, name, business_name, address, postal_code, phone, email")
+    .select("id, name, business_name, address, postal_code, phone")
     .order("name");
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">User Management</h1>
+    <div className="max-w-5xl mx-auto space-y-6">
+      <h1 className="text-xl font-bold">Users & Stores</h1>
       <UsersPageClient
         users={users}
         stores={(stores as StoreRow[]) ?? []}

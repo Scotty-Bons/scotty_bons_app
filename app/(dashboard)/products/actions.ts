@@ -104,11 +104,12 @@ export async function deleteCategory(
   const supabase = await verifyAdmin();
   if (!supabase) return { data: null, error: "Unauthorized." };
 
-  // Check if any products are assigned to this category (products table may not exist yet)
+  // Check if any active products are assigned to this category
   const { count, error: countError } = await supabase
     .from("products")
     .select("id", { count: "exact", head: true })
-    .eq("category_id", categoryId);
+    .eq("category_id", categoryId)
+    .eq("active", true);
 
   if (countError) {
     // 42P01 = undefined_table — products table doesn't exist yet, safe to proceed
@@ -118,7 +119,7 @@ export async function deleteCategory(
   } else if (count !== null && count > 0) {
     return {
       data: null,
-      error: "This category has products. Remove the products before deleting.",
+      error: "This category has active products. Remove the products before deleting.",
     };
   }
 
@@ -127,7 +128,12 @@ export async function deleteCategory(
     .delete()
     .eq("id", categoryId);
 
-  if (error) return { data: null, error: "Failed to delete category. Please try again." };
+  if (error) {
+    if (error.code === "23503") {
+      return { data: null, error: "This category still has deleted products linked to past orders. It cannot be removed." };
+    }
+    return { data: null, error: "Failed to delete category. Please try again." };
+  }
   return { data: null, error: null };
 }
 
@@ -220,8 +226,9 @@ export async function deleteProduct(
 
   const { error } = await supabase
     .from("products")
-    .delete()
+    .update({ active: false })
     .eq("id", productId)
+    .eq("active", true)
     .select("id")
     .single();
 
