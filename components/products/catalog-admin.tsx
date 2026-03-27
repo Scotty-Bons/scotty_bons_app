@@ -303,8 +303,9 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                                       {product.name}
                                     </span>
                                     <p className="text-xs text-muted-foreground">
-                                      {formatPrice(product.price)}
-                                      {product.modifier ? ` · ${product.modifier}` : ""}
+                                      {product.modifiers.map((m) =>
+                                        `${m.label} ${formatPrice(m.price)}`
+                                      ).join(" · ")}
                                     </p>
                                   </div>
                                 </div>

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { NewOrderCart } from "@/components/orders/new-order-cart";
-import type { CategoryRow, ProductRow } from "@/lib/types";
+import type { CategoryRow, ProductRow, ProductModifierRow } from "@/lib/types";
 
 export default async function NewOrderPage() {
   const supabase = await createClient();
@@ -17,22 +17,30 @@ export default async function NewOrderPage() {
     .eq("user_id", user.id)
     .single();
 
-  // Only store users can create orders
-  if (profile?.role !== "store" || !profile.store_id) {
+  if (!profile) redirect("/orders");
+
+  const isAdmin = profile.role === "admin";
+  const isStore = profile.role === "store" && !!profile.store_id;
+
+  // Only store users and admins can create orders
+  if (!isAdmin && !isStore) {
     redirect("/orders");
   }
 
-  // Fetch categories and products (RLS allows store users to SELECT both)
-  const [categoriesResult, productsResult] = await Promise.all([
+  // Fetch categories, products, and stores (for admin) in parallel
+  const [categoriesResult, productsResult, storesResult] = await Promise.all([
     supabase
       .from("product_categories")
       .select("id, name")
       .order("name"),
     supabase
       .from("products")
-      .select("id, name, price, modifier, category_id, image_url")
+      .select("id, name, category_id, image_url, product_modifiers(id, label, price, sort_order)")
       .eq("active", true)
       .order("name"),
+    isAdmin
+      ? supabase.from("stores").select("id, name").order("name")
+      : Promise.resolve({ data: null }),
   ]);
 
   const categories: CategoryRow[] = (categoriesResult.data ?? []).map((c) => ({
@@ -44,11 +52,25 @@ export default async function NewOrderPage() {
   const products: ProductRow[] = (productsResult.data ?? []).map((p) => ({
     id: p.id,
     name: p.name,
-    price: Number(p.price),
-    modifier: p.modifier,
     category_id: p.category_id,
     image_url: p.image_url,
+    modifiers: ((p.product_modifiers ?? []) as ProductModifierRow[])
+      .map((m) => ({
+        id: m.id,
+        product_id: p.id,
+        label: m.label,
+        price: Number(m.price),
+        sort_order: m.sort_order,
+      }))
+      .sort((a, b) => a.sort_order - b.sort_order),
   }));
+
+  const stores = isAdmin
+    ? (storesResult.data ?? []).map((s: { id: string; name: string }) => ({
+        id: s.id,
+        name: s.name,
+      }))
+    : undefined;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -61,7 +83,8 @@ export default async function NewOrderPage() {
       <NewOrderCart
         categories={categories}
         products={products}
-        storeId={profile.store_id}
+        storeId={isStore ? profile.store_id! : undefined}
+        stores={stores}
       />
     </div>
   );

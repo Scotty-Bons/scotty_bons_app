@@ -8,52 +8,53 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { formatPrice } from "@/lib/utils";
-import type { CategoryRow, ProductRow } from "@/lib/types";
+import type { CategoryRow, ProductRow, ProductModifierRow } from "@/lib/types";
 import { editOrderItems } from "@/app/(dashboard)/orders/[order-id]/actions";
 
 type CartItem = {
+  modifier_id: string;
   product_id: string;
   product_name: string;
-  modifier: string;
+  modifier_label: string;
   unit_price: number;
   quantity: number;
 };
 
-type CartState = { items: Map<string, CartItem> };
+type CartState = { items: Map<string, CartItem> }; // keyed by modifier_id
 
 type CartAction =
   | { type: "ADD_ITEM"; payload: CartItem }
-  | { type: "REMOVE_ITEM"; payload: { product_id: string } }
-  | { type: "UPDATE_QUANTITY"; payload: { product_id: string; quantity: number } };
+  | { type: "REMOVE_ITEM"; payload: { modifier_id: string } }
+  | { type: "UPDATE_QUANTITY"; payload: { modifier_id: string; quantity: number } };
 
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case "ADD_ITEM": {
       const next = new Map(state.items);
-      const existing = next.get(action.payload.product_id);
+      const existing = next.get(action.payload.modifier_id);
       if (existing) {
-        next.set(action.payload.product_id, {
+        next.set(action.payload.modifier_id, {
           ...existing,
           quantity: existing.quantity + action.payload.quantity,
         });
       } else {
-        next.set(action.payload.product_id, action.payload);
+        next.set(action.payload.modifier_id, action.payload);
       }
       return { items: next };
     }
     case "REMOVE_ITEM": {
       const next = new Map(state.items);
-      next.delete(action.payload.product_id);
+      next.delete(action.payload.modifier_id);
       return { items: next };
     }
     case "UPDATE_QUANTITY": {
       const next = new Map(state.items);
       if (action.payload.quantity <= 0) {
-        next.delete(action.payload.product_id);
+        next.delete(action.payload.modifier_id);
       } else {
-        const existing = next.get(action.payload.product_id);
+        const existing = next.get(action.payload.modifier_id);
         if (existing) {
-          next.set(action.payload.product_id, {
+          next.set(action.payload.modifier_id, {
             ...existing,
             quantity: action.payload.quantity,
           });
@@ -77,13 +78,34 @@ export function EditOrderCart({ orderId, categories, products, currentItems }: E
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
+  // Build a lookup: product_id + modifier label → modifier_id
+  const modifierLookup = useMemo(() => {
+    const map = new Map<string, ProductModifierRow>();
+    for (const product of products) {
+      for (const mod of product.modifiers) {
+        map.set(`${product.id}|${mod.label}`, mod);
+      }
+    }
+    return map;
+  }, [products]);
+
   const initialItems = useMemo(() => {
     const map = new Map<string, CartItem>();
     for (const item of currentItems) {
-      map.set(item.product_id, item);
+      // Try to match to a current modifier
+      const mod = modifierLookup.get(`${item.product_id}|${item.modifier}`);
+      const key = mod?.id ?? `legacy-${item.product_id}-${item.modifier}`;
+      map.set(key, {
+        modifier_id: key,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        modifier_label: item.modifier,
+        unit_price: mod?.price ?? item.unit_price,
+        quantity: item.quantity,
+      });
     }
     return map;
-  }, [currentItems]);
+  }, [currentItems, modifierLookup]);
 
   const [cart, dispatch] = useReducer(cartReducer, { items: initialItems });
 
@@ -108,14 +130,15 @@ export function EditOrderCart({ orderId, categories, products, currentItems }: E
     0
   );
 
-  const handleAddItem = (product: ProductRow) => {
+  const handleAddModifier = (product: ProductRow, modifier: ProductModifierRow) => {
     dispatch({
       type: "ADD_ITEM",
       payload: {
+        modifier_id: modifier.id,
         product_id: product.id,
         product_name: product.name,
-        modifier: product.modifier,
-        unit_price: product.price,
+        modifier_label: modifier.label,
+        unit_price: modifier.price,
         quantity: 1,
       },
     });
@@ -124,7 +147,7 @@ export function EditOrderCart({ orderId, categories, products, currentItems }: E
   const handleSave = () => {
     startTransition(async () => {
       const items = cartItems.map((item) => ({
-        product_id: item.product_id,
+        modifier_id: item.modifier_id,
         quantity: item.quantity,
       }));
 
@@ -155,13 +178,13 @@ export function EditOrderCart({ orderId, categories, products, currentItems }: E
             <div className="rounded-md border divide-y">
               {cartItems.map((item) => (
                 <div
-                  key={item.product_id}
+                  key={item.modifier_id}
                   className="flex items-center justify-between gap-3 px-4 py-3"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{item.product_name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatPrice(item.unit_price)} &middot; {item.modifier}
+                      {formatPrice(item.unit_price)} · {item.modifier_label}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -173,7 +196,7 @@ export function EditOrderCart({ orderId, categories, products, currentItems }: E
                         onClick={() =>
                           dispatch({
                             type: "UPDATE_QUANTITY",
-                            payload: { product_id: item.product_id, quantity: item.quantity - 1 },
+                            payload: { modifier_id: item.modifier_id, quantity: item.quantity - 1 },
                           })
                         }
                       >
@@ -188,7 +211,7 @@ export function EditOrderCart({ orderId, categories, products, currentItems }: E
                           if (!Number.isNaN(val)) {
                             dispatch({
                               type: "UPDATE_QUANTITY",
-                              payload: { product_id: item.product_id, quantity: Math.max(1, val) },
+                              payload: { modifier_id: item.modifier_id, quantity: Math.max(1, val) },
                             });
                           }
                         }}
@@ -201,7 +224,7 @@ export function EditOrderCart({ orderId, categories, products, currentItems }: E
                         onClick={() =>
                           dispatch({
                             type: "UPDATE_QUANTITY",
-                            payload: { product_id: item.product_id, quantity: item.quantity + 1 },
+                            payload: { modifier_id: item.modifier_id, quantity: item.quantity + 1 },
                           })
                         }
                       >
@@ -216,7 +239,7 @@ export function EditOrderCart({ orderId, categories, products, currentItems }: E
                       size="icon"
                       className="size-8 text-destructive hover:text-destructive"
                       onClick={() =>
-                        dispatch({ type: "REMOVE_ITEM", payload: { product_id: item.product_id } })
+                        dispatch({ type: "REMOVE_ITEM", payload: { modifier_id: item.modifier_id } })
                       }
                     >
                       <Trash2 className="size-3.5" />
@@ -233,7 +256,7 @@ export function EditOrderCart({ orderId, categories, products, currentItems }: E
         </CardContent>
       </Card>
 
-      {/* Product catalog */}
+      {/* Product catalog — one row per modifier */}
       {categoriesWithProducts.map((cat) => (
         <Card key={cat.id}>
           <CardHeader>
@@ -241,81 +264,83 @@ export function EditOrderCart({ orderId, categories, products, currentItems }: E
           </CardHeader>
           <CardContent>
             <div className="rounded-md border divide-y">
-              {(productsByCategory.get(cat.id) ?? []).map((product) => {
-                const inCart = cart.items.get(product.id);
-                return (
-                  <div
-                    key={product.id}
-                    className="flex items-center gap-3 px-4 py-3"
-                  >
-                    <Package className="size-4 text-muted-foreground shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium">{product.name}</span>
-                      <p className="text-xs text-muted-foreground">
-                        {formatPrice(product.price)} &middot; {product.modifier}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {inCart ? (
-                        <div className="flex items-center gap-1">
+              {(productsByCategory.get(cat.id) ?? []).flatMap((product) =>
+                product.modifiers.map((modifier) => {
+                  const inCart = cart.items.get(modifier.id);
+                  return (
+                    <div
+                      key={modifier.id}
+                      className="flex items-center gap-3 px-4 py-3"
+                    >
+                      <Package className="size-4 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium">{product.name}</span>
+                        <p className="text-xs text-muted-foreground">
+                          {formatPrice(modifier.price)} · {modifier.label}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {inCart ? (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="size-8"
+                              onClick={() =>
+                                dispatch({
+                                  type: "UPDATE_QUANTITY",
+                                  payload: { modifier_id: modifier.id, quantity: inCart.quantity - 1 },
+                                })
+                              }
+                            >
+                              <Minus className="size-3" />
+                            </Button>
+                            <span className="text-sm font-medium w-8 text-center">
+                              {inCart.quantity}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="size-8"
+                              onClick={() =>
+                                dispatch({
+                                  type: "UPDATE_QUANTITY",
+                                  payload: { modifier_id: modifier.id, quantity: inCart.quantity + 1 },
+                                })
+                              }
+                            >
+                              <Plus className="size-3" />
+                            </Button>
+                          </div>
+                        ) : (
                           <Button
                             variant="outline"
-                            size="icon"
-                            className="size-8"
-                            onClick={() =>
-                              dispatch({
-                                type: "UPDATE_QUANTITY",
-                                payload: { product_id: product.id, quantity: inCart.quantity - 1 },
-                              })
-                            }
+                            size="sm"
+                            onClick={() => handleAddModifier(product, modifier)}
+                            className="min-w-[44px]"
                           >
-                            <Minus className="size-3" />
+                            Add
                           </Button>
-                          <span className="text-sm font-medium w-8 text-center">
-                            {inCart.quantity}
-                          </span>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="size-8"
-                            onClick={() =>
-                              dispatch({
-                                type: "UPDATE_QUANTITY",
-                                payload: { product_id: product.id, quantity: inCart.quantity + 1 },
-                              })
-                            }
-                          >
-                            <Plus className="size-3" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAddItem(product)}
-                          className="min-w-[44px]"
-                        >
-                          Add
-                        </Button>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </CardContent>
         </Card>
       ))}
 
       {/* Sticky action bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t bg-background/95 backdrop-blur p-4">
+      <div className="fixed bottom-0 inset-x-0 md:left-60 z-20 border-t bg-background/95 backdrop-blur p-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
           <Button variant="outline" onClick={() => router.back()}>
             Cancel
           </Button>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">
-              {cartItems.length} {cartItems.length === 1 ? "item" : "items"} &middot;{" "}
+              {cartItems.length} {cartItems.length === 1 ? "item" : "items"} ·{" "}
               {formatPrice(cartTotal)}
             </span>
             <Button

@@ -139,7 +139,7 @@ export async function deleteCategory(
 
 export async function createProduct(
   values: CreateProductValues
-): Promise<ActionResult<ProductRow | null>> {
+): Promise<ActionResult<{ id: string } | null>> {
   const parsed = createProductSchema.safeParse(values);
   if (!parsed.success) {
     return { data: null, error: parsed.error.issues[0]?.message ?? "Invalid input." };
@@ -148,28 +148,45 @@ export async function createProduct(
   const supabase = await verifyAdmin();
   if (!supabase) return { data: null, error: "Unauthorized." };
 
+  // Insert product (no price/modifier columns)
   const { data, error } = await supabase
     .from("products")
     .insert({
       name: parsed.data.name,
-      price: parsed.data.price,
-      modifier: parsed.data.modifier,
       category_id: parsed.data.category_id,
     })
-    .select("id, name, price, modifier, category_id, image_url")
+    .select("id")
     .single();
 
   if (error) {
     if (error.code === "23503") {
       return { data: null, error: "Invalid category. Please select a valid category." };
     }
-    if (error.code === "23505") {
-      return { data: null, error: "A product with this name already exists in this category." };
-    }
     return { data: null, error: "Failed to create product. Please try again." };
   }
 
-  return { data: data as ProductRow, error: null };
+  // Insert modifiers
+  const modifierRows = parsed.data.modifiers.map((m, i) => ({
+    product_id: data.id,
+    label: m.label,
+    price: m.price,
+    sort_order: m.sort_order ?? i,
+  }));
+
+  const { error: modError } = await supabase
+    .from("product_modifiers")
+    .insert(modifierRows);
+
+  if (modError) {
+    // Rollback: delete the product
+    await supabase.from("products").delete().eq("id", data.id);
+    if (modError.code === "23505") {
+      return { data: null, error: "Duplicate modifier labels. Each modifier must have a unique label." };
+    }
+    return { data: null, error: "Failed to create modifiers. Please try again." };
+  }
+
+  return { data: { id: data.id }, error: null };
 }
 
 export async function updateProduct(
@@ -187,12 +204,11 @@ export async function updateProduct(
   const supabase = await verifyAdmin();
   if (!supabase) return { data: null, error: "Unauthorized." };
 
+  // Update product name/category
   const { error } = await supabase
     .from("products")
     .update({
       name: parsed.data.name,
-      price: parsed.data.price,
-      modifier: parsed.data.modifier,
       category_id: parsed.data.category_id,
     })
     .eq("id", productId)
@@ -206,10 +222,31 @@ export async function updateProduct(
     if (error.code === "23503") {
       return { data: null, error: "Invalid category. Please select a valid category." };
     }
-    if (error.code === "23505") {
-      return { data: null, error: "A product with this name already exists in this category." };
-    }
     return { data: null, error: "Failed to update product. Please try again." };
+  }
+
+  // Sync modifiers: delete all existing, re-insert
+  await supabase
+    .from("product_modifiers")
+    .delete()
+    .eq("product_id", productId);
+
+  const modifierRows = parsed.data.modifiers.map((m, i) => ({
+    product_id: productId,
+    label: m.label,
+    price: m.price,
+    sort_order: m.sort_order ?? i,
+  }));
+
+  const { error: modError } = await supabase
+    .from("product_modifiers")
+    .insert(modifierRows);
+
+  if (modError) {
+    if (modError.code === "23505") {
+      return { data: null, error: "Duplicate modifier labels. Each modifier must have a unique label." };
+    }
+    return { data: null, error: "Failed to update modifiers. Please try again." };
   }
 
   return { data: null, error: null };

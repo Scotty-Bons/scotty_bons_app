@@ -133,7 +133,9 @@ export function CatalogBrowser({ categories, products }: CatalogBrowserProps) {
                     <div>
                       <span className="text-sm font-medium">{product.name}</span>
                       <p className="text-xs text-muted-foreground">
-                        {formatPrice(product.price)} &middot; {product.modifier}
+                        {product.modifiers.map((m) =>
+                          `${m.label} ${formatPrice(m.price)}`
+                        ).join(" · ")}
                       </p>
                     </div>
                   </div>

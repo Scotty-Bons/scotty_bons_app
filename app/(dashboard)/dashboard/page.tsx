@@ -24,6 +24,41 @@ import {
   type ProductAggregate,
   type CategoryAggregate,
 } from "@/components/dashboard/top-products-section";
+import { DashboardDateFilter } from "@/components/dashboard/dashboard-date-filter";
+
+function getDateRange(range: string): { from: Date; label: string } {
+  const now = new Date();
+  switch (range) {
+    case "7d": {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 7);
+      return { from: d, label: "Last 7 days" };
+    }
+    case "30d": {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 30);
+      return { from: d, label: "Last 30 days" };
+    }
+    case "3m": {
+      const d = new Date(now);
+      d.setMonth(d.getMonth() - 3);
+      return { from: d, label: "Last 3 months" };
+    }
+    case "6m": {
+      const d = new Date(now);
+      d.setMonth(d.getMonth() - 6);
+      return { from: d, label: "Last 6 months" };
+    }
+    case "all":
+      return { from: new Date(0), label: "All time" };
+    case "12m":
+    default: {
+      const d = new Date(now);
+      d.setMonth(d.getMonth() - 12);
+      return { from: d, label: "Last 12 months" };
+    }
+  }
+}
 
 const ALL_STATUSES: OrderStatus[] = [
   "submitted",
@@ -95,7 +130,16 @@ const STORE_PALETTE = [
   "#6366f1",
 ];
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string }>;
+}) {
+  const { range: rangeParam } = await searchParams;
+  const rangeKey = rangeParam ?? "12m";
+  const { from: rangeFrom, label: rangeLabel } = getDateRange(rangeKey);
+  const rangeFromISO = rangeFrom.toISOString();
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -111,11 +155,7 @@ export default async function DashboardPage() {
 
   if (!profile || profile.role !== "admin") redirect("/orders");
 
-  // ── Fetch all data in parallel ──
-  const twelveMonthsAgo = new Date();
-  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-  const twelveMonthsAgoISO = twelveMonthsAgo.toISOString();
-
+  // ── Fetch all data in parallel (filtered by date range) ──
   const [
     ordersResult,
     itemsResult,
@@ -127,6 +167,7 @@ export default async function DashboardPage() {
     supabase
       .from("orders")
       .select("id, order_number, store_id, status, created_at")
+      .gte("created_at", rangeFromISO)
       .order("created_at", { ascending: false }),
     supabase
       .from("order_items")
@@ -136,17 +177,22 @@ export default async function DashboardPage() {
       .from("audits")
       .select("id, store_id, score, conducted_at")
       .not("conducted_at", "is", null)
+      .gte("conducted_at", rangeFromISO)
       .order("conducted_at", { ascending: true }),
-    supabase.from("products").select("id, name, modifier, category_id"),
+    supabase.from("products").select("id, name, category_id, product_modifiers(label)"),
     supabase.from("product_categories").select("id, name"),
   ]);
 
   const orders = ordersResult.data ?? [];
-  const allItems = itemsResult.data ?? [];
+  const allRawItems = itemsResult.data ?? [];
   const stores = storesResult.data ?? [];
   const completedAudits = completedAuditsResult.data ?? [];
   const products = productsResult.data ?? [];
   const categories = categoriesResult.data ?? [];
+
+  // Filter items to only those belonging to orders in the date range
+  const orderIdSet = new Set(orders.map((o) => o.id));
+  const allItems = allRawItems.filter((item) => orderIdSet.has(item.order_id));
 
   // ── Maps ──
   const storeNameMap: Record<string, string> = {};
@@ -166,8 +212,16 @@ export default async function DashboardPage() {
 
   const productCategoryMap: Record<string, string> = {};
   for (const p of products) {
-    const key = `${p.name}|${p.modifier ?? ""}`;
-    productCategoryMap[key] = categoryNameMap[p.category_id] ?? "Uncategorized";
+    const mods = (p as { product_modifiers?: { label: string }[] }).product_modifiers ?? [];
+    if (mods.length > 0) {
+      for (const m of mods) {
+        const key = `${p.name}|${m.label}`;
+        productCategoryMap[key] = categoryNameMap[p.category_id] ?? "Uncategorized";
+      }
+    } else {
+      // Fallback for products without modifiers
+      productCategoryMap[`${p.name}|`] = categoryNameMap[p.category_id] ?? "Uncategorized";
+    }
   }
 
   const orderStoreMap: Record<string, string> = {};
@@ -195,14 +249,10 @@ export default async function DashboardPage() {
   }
 
   // ══════════════════════════════════════════════
-  // 2. ORDER VALUE CHART (last 12 months, per store)
+  // 2. ORDER VALUE CHART (per store, within date range)
   // ══════════════════════════════════════════════
-  const recentOrders = orders.filter(
-    (o) => o.created_at >= twelveMonthsAgoISO,
-  );
-
   const orderValueByMonthStore: Record<string, Record<string, number>> = {};
-  for (const order of recentOrders) {
+  for (const order of orders) {
     const d = new Date(order.created_at);
     const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const storeName = storeNameMap[order.store_id] ?? "Unknown";
@@ -214,15 +264,17 @@ export default async function DashboardPage() {
       (orderTotals[order.id] ?? 0);
   }
 
+  // Generate month labels from rangeFrom to now
   const orderValueChartData: OrderValueDataPoint[] = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const chartStart = new Date(rangeFrom.getFullYear(), rangeFrom.getMonth(), 1);
+  const chartEnd = new Date();
+  const cursor = new Date(chartStart);
+  while (cursor <= chartEnd) {
+    const monthKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
     const label = new Intl.DateTimeFormat("en-CA", {
       year: "numeric",
       month: "short",
-    }).format(d);
+    }).format(cursor);
 
     const point: OrderValueDataPoint = { month: label };
     const monthData = orderValueByMonthStore[monthKey] ?? {};
@@ -230,6 +282,7 @@ export default async function DashboardPage() {
       point[storeName] = monthData[storeName] ?? 0;
     }
     orderValueChartData.push(point);
+    cursor.setMonth(cursor.getMonth() + 1);
   }
 
   // ══════════════════════════════════════════════
@@ -404,11 +457,14 @@ export default async function DashboardPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {/* ── Header ── */}
-      <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          {dateFmt.format(new Date())}
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            {rangeLabel} &middot; {dateFmt.format(new Date())}
+          </p>
+        </div>
+        <DashboardDateFilter current={rangeKey} />
       </div>
 
       {/* ══ 1. Order Status Cards ══ */}

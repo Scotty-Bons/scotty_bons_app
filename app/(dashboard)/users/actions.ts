@@ -210,6 +210,33 @@ export async function reactivateUser(
   return { data: null, error: null };
 }
 
+export async function resetUserPassword(
+  userId: string,
+  newPassword: string
+): Promise<ActionResult<null>> {
+  const idParsed = userIdSchema.safeParse(userId);
+  if (!idParsed.success) return { data: null, error: "Invalid user ID." };
+
+  if (!newPassword || newPassword.length < 6) {
+    return { data: null, error: "Password must be at least 6 characters." };
+  }
+
+  const caller = await verifyAdmin();
+  if (!caller) return { data: null, error: "Unauthorized." };
+
+  if (caller.id === userId) {
+    return { data: null, error: "Use the Settings page to change your own password." };
+  }
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient.auth.admin.updateUserById(userId, {
+    password: newPassword,
+  });
+
+  if (error) return { data: null, error: "Failed to reset password. Please try again." };
+  return { data: null, error: null };
+}
+
 export async function createStore(
   values: CreateStoreValues
 ): Promise<ActionResult<StoreRow | null>> {

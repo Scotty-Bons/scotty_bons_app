@@ -5,10 +5,10 @@ export const createOrderSchema = z.object({
   items: z
     .array(
       z.object({
-        product_id: z.string().uuid("Invalid product."),
-        product_name: z.string().min(1, "Product name is required."),
-        modifier: z.string().min(1, "Modifier is required."),
-        unit_price: z.number().positive("Price must be greater than zero."),
+        modifier_id: z.string().uuid("Invalid modifier."),
+        product_name: z.string().min(1),
+        modifier_label: z.string().min(1),
+        unit_price: z.number().positive(),
         quantity: z.number().int().positive("Quantity must be at least 1."),
       })
     )

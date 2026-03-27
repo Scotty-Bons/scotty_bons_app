@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CatalogAdmin } from "@/components/products/catalog-admin";
 import { CatalogBrowser } from "@/components/products/catalog-browser";
-import type { CategoryRow, ProductRow } from "@/lib/types";
+import type { CategoryRow, ProductRow, ProductModifierRow } from "@/lib/types";
 
 export default async function ProductsPage() {
   const supabase = await createClient();
@@ -29,7 +29,7 @@ export default async function ProductsPage() {
 
   const { data: productsRaw, error: productsError } = await supabase
     .from("products")
-    .select("id, name, price, modifier, category_id, image_url")
+    .select("id, name, category_id, image_url, product_modifiers(id, label, price, sort_order)")
     .eq("active", true)
     .order("name");
 
@@ -38,10 +38,17 @@ export default async function ProductsPage() {
   const products: ProductRow[] = (productsRaw ?? []).map((p) => ({
     id: p.id,
     name: p.name,
-    price: Number(p.price),
-    modifier: p.modifier,
     category_id: p.category_id,
     image_url: p.image_url,
+    modifiers: ((p.product_modifiers ?? []) as ProductModifierRow[])
+      .map((m) => ({
+        id: m.id,
+        product_id: p.id,
+        label: m.label,
+        price: Number(m.price),
+        sort_order: m.sort_order,
+      }))
+      .sort((a, b) => a.sort_order - b.sort_order),
   }));
 
   // Compute product counts per category

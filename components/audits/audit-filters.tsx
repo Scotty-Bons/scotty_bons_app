@@ -52,7 +52,7 @@ export function AuditFilters({ role, stores }: AuditFiltersProps) {
     <div
       className={`flex flex-wrap items-end gap-3 ${isPending ? "opacity-60" : ""}`}
     >
-      <div className="w-[160px]">
+      <div className="flex-1 min-w-[140px] max-w-[200px]">
         <label className="text-xs font-medium text-muted-foreground mb-1 block">
           Status
         </label>
@@ -60,7 +60,7 @@ export function AuditFilters({ role, stores }: AuditFiltersProps) {
           value={currentStatus || "all"}
           onValueChange={(v) => updateParams({ status: v === "all" ? "" : v })}
         >
-          <SelectTrigger className="rounded-xl h-10">
+          <SelectTrigger className="rounded-xl h-10 w-full">
             <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent className="rounded-xl">
@@ -72,7 +72,7 @@ export function AuditFilters({ role, stores }: AuditFiltersProps) {
       </div>
 
       {role !== "store" && stores.length > 0 && (
-        <div className="w-[180px]">
+        <div className="flex-1 min-w-[140px] max-w-[200px]">
           <label className="text-xs font-medium text-muted-foreground mb-1 block">
             Store
           </label>

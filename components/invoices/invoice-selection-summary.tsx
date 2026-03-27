@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/utils";
-import { getInvoiceItemsForInvoices } from "@/app/(dashboard)/invoices/actions";
+import { getInvoiceItemsForInvoices, getInvoiceTotalsForInvoices } from "@/app/(dashboard)/invoices/actions";
 import type { InvoiceItemRow } from "@/lib/types";
 
 interface InvoiceSelectableListProps {
@@ -35,6 +35,10 @@ export function InvoiceSelectableList({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [aggregated, setAggregated] = useState<AggregatedItem[]>([]);
+  const [subtotal, setSubtotal] = useState(0);
+  const [hstRate, setHstRate] = useState(0);
+  const [hstAmount, setHstAmount] = useState(0);
+  const [adFee, setAdFee] = useState(0);
   const [grandTotal, setGrandTotal] = useState(0);
 
   const toggleSelection = useCallback(
@@ -66,17 +70,18 @@ export function InvoiceSelectableList({
     if (ids.length < 2) return;
 
     startTransition(async () => {
-      const result = await getInvoiceItemsForInvoices(ids);
-      if (result.error || !result.data) return;
+      const [itemsResult, totalsResult] = await Promise.all([
+        getInvoiceItemsForInvoices(ids),
+        getInvoiceTotalsForInvoices(ids),
+      ]);
+      if (itemsResult.error || !itemsResult.data) return;
 
       const map = new Map<string, AggregatedItem>();
-      let total = 0;
 
-      for (const item of result.data as InvoiceItemRow[]) {
+      for (const item of itemsResult.data as InvoiceItemRow[]) {
         const key = `${item.product_name}|${item.modifier}|${item.unit_price}`;
         const existing = map.get(key);
         const lineTotal = Number(item.line_total);
-        total += lineTotal;
 
         if (existing) {
           existing.total_qty += item.quantity;
@@ -94,7 +99,14 @@ export function InvoiceSelectableList({
       }
 
       setAggregated(Array.from(map.values()).sort((a, b) => a.product_name.localeCompare(b.product_name)));
-      setGrandTotal(total);
+
+      if (totalsResult.data) {
+        setSubtotal(totalsResult.data.subtotal);
+        setHstRate(totalsResult.data.tax_rate);
+        setHstAmount(totalsResult.data.tax_amount);
+        setAdFee(totalsResult.data.ad_royalties_fee);
+        setGrandTotal(totalsResult.data.grand_total);
+      }
     });
   };
 
@@ -131,14 +143,6 @@ export function InvoiceSelectableList({
           )}
         </div>
       )}
-
-      {children({
-        isSelected: (id) => selected.has(id),
-        toggleSelection,
-        selectAll,
-        clearAll,
-        selectedCount: selected.size,
-      })}
 
       {aggregated.length > 0 && (
         <Card>
@@ -177,6 +181,32 @@ export function InvoiceSelectableList({
                   ))}
                 </tbody>
                 <tfoot>
+                  <tr className="border-t">
+                    <td colSpan={4} className="py-1.5 text-right text-muted-foreground">
+                      Subtotal
+                    </td>
+                    <td className="py-1.5 text-right font-medium">
+                      {formatPrice(subtotal)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colSpan={4} className="py-1.5 text-right text-muted-foreground">
+                      HST ({(hstRate * 100).toFixed(0)}%)
+                    </td>
+                    <td className="py-1.5 text-right font-medium">
+                      {formatPrice(hstAmount)}
+                    </td>
+                  </tr>
+                  {adFee > 0 && (
+                    <tr>
+                      <td colSpan={4} className="py-1.5 text-right text-muted-foreground">
+                        Ad &amp; Royalties Fee
+                      </td>
+                      <td className="py-1.5 text-right font-medium">
+                        {formatPrice(adFee)}
+                      </td>
+                    </tr>
+                  )}
                   <tr className="border-t-2">
                     <td colSpan={4} className="py-2 text-right font-semibold">
                       Grand Total
@@ -191,6 +221,14 @@ export function InvoiceSelectableList({
           </CardContent>
         </Card>
       )}
+
+      {children({
+        isSelected: (id) => selected.has(id),
+        toggleSelection,
+        selectAll,
+        clearAll,
+        selectedCount: selected.size,
+      })}
     </div>
   );
 }

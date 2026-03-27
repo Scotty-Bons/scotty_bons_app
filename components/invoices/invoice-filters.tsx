@@ -62,9 +62,20 @@ export function InvoiceFilters({ role, stores }: InvoiceFiltersProps) {
 
   return (
     <div
-      className={`flex flex-wrap items-end gap-3 ${isPending ? "opacity-60" : ""}`}
+      className={`grid items-end gap-3 ${isPending ? "opacity-60" : ""}`}
+      style={{
+        gridTemplateColumns: [
+          "1fr",           // From
+          "1fr",           // To
+          role !== "store" && stores.length > 0 ? "1fr" : null, // Store
+          "2fr",           // Search
+          hasFilters ? "auto" : null, // Clear
+        ]
+          .filter(Boolean)
+          .join(" "),
+      }}
     >
-      <div className="w-[160px]">
+      <div>
         <label className="text-xs font-medium text-muted-foreground mb-1 block">
           From
         </label>
@@ -76,7 +87,7 @@ export function InvoiceFilters({ role, stores }: InvoiceFiltersProps) {
         />
       </div>
 
-      <div className="w-[160px]">
+      <div>
         <label className="text-xs font-medium text-muted-foreground mb-1 block">
           To
         </label>
@@ -89,7 +100,7 @@ export function InvoiceFilters({ role, stores }: InvoiceFiltersProps) {
       </div>
 
       {role !== "store" && stores.length > 0 && (
-        <div className="w-[180px]">
+        <div>
           <label className="text-xs font-medium text-muted-foreground mb-1 block">
             Store
           </label>
@@ -114,7 +125,7 @@ export function InvoiceFilters({ role, stores }: InvoiceFiltersProps) {
         </div>
       )}
 
-      <div className="flex-1 min-w-[200px]">
+      <div>
         <label className="text-xs font-medium text-muted-foreground mb-1 block">
           Search
         </label>

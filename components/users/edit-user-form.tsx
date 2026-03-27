@@ -1,9 +1,10 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { Eye, EyeOff, KeyRound } from "lucide-react";
 import {
   Form,
   FormControl,
@@ -21,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { updateUser } from "@/app/(dashboard)/users/actions";
+import { updateUser, resetUserPassword } from "@/app/(dashboard)/users/actions";
 import { updateUserSchema, type UpdateUserValues } from "@/lib/validations/users";
 import type { StoreRow, UserRow } from "@/lib/types";
 
@@ -34,6 +35,9 @@ interface EditUserFormProps {
 
 export function EditUserForm({ user, stores, currentUserId, onSuccess }: EditUserFormProps) {
   const [isPending, startTransition] = useTransition();
+  const [isResetting, startResetTransition] = useTransition();
+  const [newPassword, setNewPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const isEditingSelf = user.id === currentUserId;
 
   const form = useForm<UpdateUserValues>({
@@ -167,6 +171,53 @@ export function EditUserForm({ user, stores, currentUserId, onSuccess }: EditUse
           </Button>
         </div>
       </form>
+
+      {/* Reset Password section */}
+      {!isEditingSelf && (
+        <div className="border-t pt-4 mt-2 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <KeyRound className="size-4 text-muted-foreground" />
+            Reset Password
+          </div>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Input
+                type={showPassword ? "text" : "password"}
+                placeholder="New password (min 6 chars)"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="pr-10"
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
+            <Button
+              variant="outline"
+              size="default"
+              disabled={isResetting || newPassword.length < 6}
+              onClick={() => {
+                startResetTransition(async () => {
+                  const result = await resetUserPassword(user.id, newPassword);
+                  if (result.error) {
+                    toast.error(result.error);
+                    return;
+                  }
+                  toast.success("Password reset successfully.");
+                  setNewPassword("");
+                });
+              }}
+            >
+              {isResetting ? "Resetting..." : "Reset"}
+            </Button>
+          </div>
+        </div>
+      )}
     </Form>
   );
 }

@@ -117,11 +117,26 @@ export default async function OrderDetailPage({
     invoiceId = invoice?.id ?? null;
   }
 
+  // Fetch financial settings for tax/fee calculation
+  const { data: financialSettings } = await supabase
+    .from("financial_settings")
+    .select("key, value")
+    .in("key", ["hst_rate", "ad_royalties_fee"]);
+
+  const fsMap: Record<string, string> = {};
+  for (const row of financialSettings ?? []) fsMap[row.key] = row.value;
+
+  const hstRate = Number(fsMap.hst_rate ?? "13") / 100;
+  const adRoyaltiesFee = Number(fsMap.ad_royalties_fee ?? "0");
+
   // Calculate order total from items
-  const orderTotal = orderItems.reduce(
+  const subtotal = orderItems.reduce(
     (sum, item) => sum + Number(item.unit_price) * item.quantity,
     0
   );
+  const taxAmount = subtotal * hstRate;
+  const grandTotal = subtotal + taxAmount + adRoyaltiesFee;
+  const orderTotal = subtotal;
 
   const formatDate = (timestamp: string) =>
     new Intl.DateTimeFormat("en-CA", {
@@ -223,7 +238,7 @@ export default async function OrderDetailPage({
             </div>
             <div>
               <dt className="text-muted-foreground">Total</dt>
-              <dd className="font-medium text-lg">{formatPrice(orderTotal)}</dd>
+              <dd className="font-medium text-lg">{formatPrice(grandTotal)}</dd>
             </div>
             {storeName && (
               <div>
@@ -302,12 +317,38 @@ export default async function OrderDetailPage({
                 })}
               </tbody>
               <tfoot>
+                <tr className="border-t">
+                  <td colSpan={4} className="py-1.5 text-right text-muted-foreground">
+                    Subtotal
+                  </td>
+                  <td className="py-1.5 text-right">
+                    {formatPrice(subtotal)}
+                  </td>
+                </tr>
+                <tr>
+                  <td colSpan={4} className="py-1.5 text-right text-muted-foreground">
+                    HST ({(hstRate * 100).toFixed(2)}%)
+                  </td>
+                  <td className="py-1.5 text-right">
+                    {formatPrice(taxAmount)}
+                  </td>
+                </tr>
+                {adRoyaltiesFee > 0 && (
+                  <tr>
+                    <td colSpan={4} className="py-1.5 text-right text-muted-foreground">
+                      Ad & Royalties Fee
+                    </td>
+                    <td className="py-1.5 text-right">
+                      {formatPrice(adRoyaltiesFee)}
+                    </td>
+                  </tr>
+                )}
                 <tr className="border-t-2">
                   <td colSpan={4} className="py-2 text-right font-semibold">
-                    Order Total
+                    Grand Total
                   </td>
                   <td className="py-2 text-right font-bold text-lg">
-                    {formatPrice(orderTotal)}
+                    {formatPrice(grandTotal)}
                   </td>
                 </tr>
               </tfoot>

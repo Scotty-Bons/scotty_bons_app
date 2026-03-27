@@ -30,14 +30,21 @@ export type CategoryRow = {
   product_count: number;
 };
 
+export type ProductModifierRow = {
+  id: string;
+  product_id: string;
+  label: string;
+  price: number;
+  sort_order: number;
+};
+
 export type ProductRow = {
   id: string;
   name: string;
-  price: number;
-  modifier: string;
   category_id: string;
   category_name?: string;
   image_url?: string | null;
+  modifiers: ProductModifierRow[];
 };
 
 export type OrderStatus = "submitted" | "approved" | "declined" | "fulfilled";

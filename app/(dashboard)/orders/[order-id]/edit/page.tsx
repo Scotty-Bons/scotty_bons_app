@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { EditOrderCart } from "@/components/orders/edit-order-cart";
-import type { CategoryRow, ProductRow, OrderStatus } from "@/lib/types";
+import type { CategoryRow, ProductRow, ProductModifierRow, OrderStatus } from "@/lib/types";
 
 export default async function EditOrderPage({
   params,
@@ -67,7 +67,7 @@ export default async function EditOrderPage({
       .order("name"),
     supabase
       .from("products")
-      .select("id, name, price, modifier, category_id, image_url")
+      .select("id, name, category_id, image_url, product_modifiers(id, label, price, sort_order)")
       .eq("active", true)
       .order("name"),
   ]);
@@ -81,10 +81,17 @@ export default async function EditOrderPage({
   const products: ProductRow[] = (productsResult.data ?? []).map((p) => ({
     id: p.id,
     name: p.name,
-    price: Number(p.price),
-    modifier: p.modifier,
     category_id: p.category_id,
     image_url: p.image_url,
+    modifiers: ((p.product_modifiers ?? []) as ProductModifierRow[])
+      .map((m) => ({
+        id: m.id,
+        product_id: p.id,
+        label: m.label,
+        price: Number(m.price),
+        sort_order: m.sort_order,
+      }))
+      .sort((a, b) => a.sort_order - b.sort_order),
   }));
 
   return (

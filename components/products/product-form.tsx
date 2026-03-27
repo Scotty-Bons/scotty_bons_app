@@ -2,10 +2,10 @@
 
 import { useRef, useState, useTransition } from "react";
 import Image from "next/image";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { ImagePlus, Trash2 } from "lucide-react";
+import { ImagePlus, Plus, Trash2 } from "lucide-react";
 import {
   Form,
   FormControl,
@@ -40,8 +40,16 @@ interface ProductFormProps {
 export function ProductForm({ categories, product, defaultCategoryId, onSuccess }: ProductFormProps) {
   const [isPending, startTransition] = useTransition();
   const [formError, setFormError] = useState<string | null>(null);
-  const [priceDisplay, setPriceDisplay] = useState(
-    product?.price ? String(product.price) : ""
+  const [priceDisplays, setPriceDisplays] = useState<Record<number, string>>(
+    () => {
+      const map: Record<number, string> = {};
+      if (product?.modifiers) {
+        product.modifiers.forEach((m, i) => {
+          map[i] = String(m.price);
+        });
+      }
+      return map;
+    },
   );
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(product?.image_url ?? null);
@@ -53,10 +61,20 @@ export function ProductForm({ categories, product, defaultCategoryId, onSuccess 
     resolver: zodResolver(createProductSchema),
     defaultValues: {
       name: product?.name ?? "",
-      price: product?.price ?? 0,
-      modifier: product?.modifier ?? "",
       category_id: product?.category_id ?? defaultCategoryId ?? "",
+      modifiers:
+        product?.modifiers?.map((m) => ({
+          id: m.id,
+          label: m.label,
+          price: m.price,
+          sort_order: m.sort_order,
+        })) ?? [{ label: "", price: 0, sort_order: 0 }],
     },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "modifiers",
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,7 +103,6 @@ export function ProductForm({ categories, product, defaultCategoryId, onSuccess 
         return;
       }
 
-      // Handle image upload/removal after product is saved
       const productId = isEditing ? product.id : (result.data as { id: string })?.id;
       if (productId) {
         if (imageFile) {
@@ -101,7 +118,7 @@ export function ProductForm({ categories, product, defaultCategoryId, onSuccess 
       }
 
       form.reset();
-      setPriceDisplay("");
+      setPriceDisplays({});
       setImageFile(null);
       setImagePreview(null);
       setRemoveImage(false);
@@ -120,60 +137,7 @@ export function ProductForm({ categories, product, defaultCategoryId, onSuccess 
             <FormItem>
               <FormLabel>Product Name</FormLabel>
               <FormControl>
-                <Input placeholder="e.g. Orange Juice 1L" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="price"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Price</FormLabel>
-              <FormControl>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={priceDisplay}
-                  onChange={(e) => {
-                    // Replace comma with dot (PT-BR numpad sends comma for decimal)
-                    const raw = e.target.value.replace(",", ".");
-                    if (raw === "" || /^\d*\.?\d{0,2}$/.test(raw)) {
-                      setPriceDisplay(raw);
-                      field.onChange(raw === "" || raw === "." ? 0 : Number(raw));
-                    }
-                  }}
-                  onBlur={() => {
-                    field.onBlur();
-                    const num = Number(priceDisplay);
-                    if (!isNaN(num) && num > 0) {
-                      const rounded = Math.round(num * 100) / 100;
-                      field.onChange(rounded);
-                      setPriceDisplay(rounded.toFixed(2));
-                    } else {
-                      setPriceDisplay("");
-                      field.onChange(0);
-                    }
-                  }}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="modifier"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Modifier</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g. box, unit, kg" {...field} />
+                <Input placeholder="e.g. Cajun Spice" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -204,6 +168,119 @@ export function ProductForm({ categories, product, defaultCategoryId, onSuccess 
             </FormItem>
           )}
         />
+
+        {/* Modifiers */}
+        <div className="space-y-2">
+          <FormLabel>Modifiers</FormLabel>
+          <div className="space-y-2">
+            {fields.map((field, index) => (
+              <div key={field.id} className="flex items-start gap-2">
+                <FormField
+                  control={form.control}
+                  name={`modifiers.${index}.label`}
+                  render={({ field: f }) => (
+                    <FormItem className="flex-1">
+                      <FormControl>
+                        <Input placeholder="e.g. Box 5lb" {...f} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={`modifiers.${index}.price`}
+                  render={({ field: f }) => (
+                    <FormItem className="w-28">
+                      <FormControl>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={priceDisplays[index] ?? ""}
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(",", ".");
+                            if (raw === "" || /^\d*\.?\d{0,2}$/.test(raw)) {
+                              setPriceDisplays((prev) => ({
+                                ...prev,
+                                [index]: raw,
+                              }));
+                              f.onChange(
+                                raw === "" || raw === "." ? 0 : Number(raw),
+                              );
+                            }
+                          }}
+                          onBlur={() => {
+                            f.onBlur();
+                            const num = Number(priceDisplays[index]);
+                            if (!isNaN(num) && num > 0) {
+                              const rounded =
+                                Math.round(num * 100) / 100;
+                              f.onChange(rounded);
+                              setPriceDisplays((prev) => ({
+                                ...prev,
+                                [index]: rounded.toFixed(2),
+                              }));
+                            } else {
+                              setPriceDisplays((prev) => ({
+                                ...prev,
+                                [index]: "",
+                              }));
+                              f.onChange(0);
+                            }
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {fields.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-9 text-destructive hover:text-destructive shrink-0 mt-0.5"
+                    onClick={() => {
+                      remove(index);
+                      setPriceDisplays((prev) => {
+                        const next: Record<number, string> = {};
+                        Object.entries(prev).forEach(([k, v]) => {
+                          const ki = Number(k);
+                          if (ki < index) next[ki] = v;
+                          else if (ki > index) next[ki - 1] = v;
+                        });
+                        return next;
+                      });
+                    }}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              append({ label: "", price: 0, sort_order: fields.length });
+              setPriceDisplays((prev) => ({
+                ...prev,
+                [fields.length]: "",
+              }));
+            }}
+          >
+            <Plus className="size-4 mr-1" />
+            Add Modifier
+          </Button>
+          {form.formState.errors.modifiers?.message && (
+            <p className="text-sm text-destructive">
+              {form.formState.errors.modifiers.message}
+            </p>
+          )}
+        </div>
 
         <div className="space-y-2">
           <FormLabel>Product Image</FormLabel>

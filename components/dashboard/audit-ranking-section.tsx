@@ -14,7 +14,6 @@ import {
 import { ChevronDown, ChevronRight, ClipboardCheck } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatPrice } from "@/lib/utils";
 import { getScoreColor } from "@/lib/constants/audit-status";
 
 export interface AuditScoreDataPoint {
@@ -77,7 +76,6 @@ export function AuditRankingSection({ rows, dateFmt }: AuditRankingSectionProps)
               <tr className="border-b text-left">
                 <th className="pb-2 font-medium w-12">#</th>
                 <th className="pb-2 font-medium">Store</th>
-                <th className="pb-2 font-medium text-right">Order Value</th>
                 <th className="pb-2 font-medium text-center">Audits</th>
                 <th className="pb-2 font-medium text-center">Avg Score</th>
                 <th className="pb-2 font-medium text-right">Last Audit</th>
@@ -111,9 +109,6 @@ export function AuditRankingSection({ rows, dateFmt }: AuditRankingSectionProps)
                         </span>
                       </td>
                       <td className="py-2.5 font-medium">{row.storeName}</td>
-                      <td className="py-2.5 text-right font-semibold tabular-nums">
-                        {formatPrice(row.totalOrderValue)}
-                      </td>
                       <td className="py-2.5 text-center text-muted-foreground">
                         {row.count}
                       </td>
@@ -158,7 +153,7 @@ export function AuditRankingSection({ rows, dateFmt }: AuditRankingSectionProps)
                     {/* Expanded chart row */}
                     {isExpanded && hasHistory && (
                       <tr>
-                        <td colSpan={8} className="p-0">
+                        <td colSpan={7} className="p-0">
                           <div className="py-4 px-4 bg-muted/30">
                             <p className="text-xs text-muted-foreground mb-2">
                               Score evolution — {row.storeName}

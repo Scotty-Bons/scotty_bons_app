@@ -232,7 +232,7 @@ export async function fulfillOrder(
 
 export async function editOrderItems(
   orderId: string,
-  items: { product_id: string; quantity: number }[]
+  items: { modifier_id: string; quantity: number }[]
 ): Promise<ActionResult<void>> {
   if (!UUID_REGEX.test(orderId)) {
     return { data: null, error: "Invalid order ID." };
@@ -282,19 +282,31 @@ export async function editOrderItems(
     return { data: null, error: "Unauthorized." };
   }
 
-  // Validate product_ids and fetch prices
-  const productIds = items.map((i) => i.product_id);
-  const { data: products } = await supabase
+  // Validate modifier_ids and fetch prices from product_modifiers + products
+  const modifierIds = items.map((i) => i.modifier_id);
+  const { data: modifiers } = await supabase
+    .from("product_modifiers")
+    .select("id, label, price, product_id")
+    .in("id", modifierIds);
+
+  if (!modifiers || modifiers.length !== modifierIds.length) {
+    return { data: null, error: "One or more modifiers not found." };
+  }
+
+  // Fetch product names
+  const productIds = [...new Set(modifiers.map((m) => m.product_id))];
+  const { data: productsData } = await supabase
     .from("products")
-    .select("id, name, price, modifier")
+    .select("id, name")
     .in("id", productIds)
     .eq("active", true);
 
-  if (!products || products.length !== productIds.length) {
-    return { data: null, error: "One or more products not found." };
+  if (!productsData || productsData.length !== productIds.length) {
+    return { data: null, error: "One or more products are no longer available." };
   }
 
-  const productMap = new Map(products.map((p) => [p.id, p]));
+  const productNameMap = new Map(productsData.map((p) => [p.id, p.name]));
+  const modifierMap = new Map(modifiers.map((m) => [m.id, m]));
 
   // Delete existing items
   const { error: deleteError } = await supabase
@@ -308,13 +320,13 @@ export async function editOrderItems(
 
   // Insert new items with server-side prices
   const newItems = items.map((item) => {
-    const product = productMap.get(item.product_id)!;
+    const mod = modifierMap.get(item.modifier_id)!;
     return {
       order_id: orderId,
-      product_id: item.product_id,
-      product_name: product.name,
-      modifier: product.modifier,
-      unit_price: product.price,
+      product_id: mod.product_id,
+      product_name: productNameMap.get(mod.product_id) ?? "Unknown",
+      modifier: mod.label,
+      unit_price: mod.price,
       quantity: item.quantity,
     };
   });

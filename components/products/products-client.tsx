@@ -132,7 +132,7 @@ export function ProductsClient({ products, categories, isAdmin }: ProductsClient
                     <div>
                       <span className="text-sm font-medium">{product.name}</span>
                       <p className="text-xs text-muted-foreground">
-                        {formatPrice(product.price)} &middot; {product.modifier} &middot; {product.category_name}
+                        {product.modifiers.map((m) => `${m.label} ${formatPrice(m.price)}`).join(" · ")} · {product.category_name}
                       </p>
                     </div>
                   </div>
