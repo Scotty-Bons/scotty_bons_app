@@ -18,6 +18,9 @@ function loadEnv() {
     if (eqIdx === -1) continue;
     const key = trimmed.slice(0, eqIdx).trim();
     let val = trimmed.slice(eqIdx + 1).trim();
+    // Strip inline comments (# ...)
+    const hashIdx = val.indexOf(" #");
+    if (hashIdx !== -1) val = val.slice(0, hashIdx).trim();
     if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
       val = val.slice(1, -1);
     }

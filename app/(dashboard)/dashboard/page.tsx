@@ -5,20 +5,20 @@ import {
   CheckCircle,
   XCircle,
   PackageCheck,
-  ClipboardCheck,
   ArrowRight,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/utils";
 import { STATUS_LABELS } from "@/lib/constants/order-status";
-import { getScoreColor } from "@/lib/constants/audit-status";
 import type { OrderStatus } from "@/lib/types";
-import { AuditScoreChart } from "@/components/dashboard/audit-score-chart";
-import type { AuditScoreDataPoint } from "@/components/dashboard/audit-score-chart";
 import { OrderValueChart } from "@/components/dashboard/order-value-chart";
 import type { OrderValueDataPoint } from "@/components/dashboard/order-value-chart";
+import {
+  AuditRankingSection,
+  type AuditRankingRow,
+  type AuditScoreDataPoint,
+} from "@/components/dashboard/audit-ranking-section";
 import {
   TopProductsSection,
   type ProductAggregate,
@@ -34,7 +34,15 @@ const ALL_STATUSES: OrderStatus[] = [
 
 const STATUS_CARD_CONFIG: Record<
   OrderStatus,
-  { icon: typeof Clock; color: string; hoverColor: string; bg: string; hoverBg: string; border: string; hoverBorder: string }
+  {
+    icon: typeof Clock;
+    color: string;
+    hoverColor: string;
+    bg: string;
+    hoverBg: string;
+    border: string;
+    hoverBorder: string;
+  }
 > = {
   submitted: {
     icon: Clock,
@@ -156,18 +164,15 @@ export default async function DashboardPage() {
   const categoryNameMap: Record<string, string> = {};
   for (const cat of categories) categoryNameMap[cat.id] = cat.name;
 
-  // Product name+modifier → category name
   const productCategoryMap: Record<string, string> = {};
   for (const p of products) {
     const key = `${p.name}|${p.modifier ?? ""}`;
     productCategoryMap[key] = categoryNameMap[p.category_id] ?? "Uncategorized";
   }
 
-  // Order ID → store_id
   const orderStoreMap: Record<string, string> = {};
   for (const order of orders) orderStoreMap[order.id] = order.store_id;
 
-  // Order totals
   const orderTotals: Record<string, number> = {};
   for (const item of allItems) {
     orderTotals[item.order_id] =
@@ -190,87 +195,7 @@ export default async function DashboardPage() {
   }
 
   // ══════════════════════════════════════════════
-  // 2. AUDIT SCORE CHART DATA (time series per store)
-  // ══════════════════════════════════════════════
-  const auditByMonthStore: Record<
-    string,
-    Record<string, { sum: number; count: number }>
-  > = {};
-
-  for (const audit of completedAudits) {
-    if (!audit.conducted_at || audit.score === null) continue;
-    const d = new Date(audit.conducted_at);
-    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const storeName = storeNameMap[audit.store_id] ?? "Unknown";
-
-    if (!auditByMonthStore[monthKey]) auditByMonthStore[monthKey] = {};
-    const entry = auditByMonthStore[monthKey][storeName] ?? {
-      sum: 0,
-      count: 0,
-    };
-    entry.sum += audit.score;
-    entry.count++;
-    auditByMonthStore[monthKey][storeName] = entry;
-  }
-
-  const auditChartData: AuditScoreDataPoint[] = Object.keys(auditByMonthStore)
-    .sort()
-    .map((monthKey) => {
-      const [y, m] = monthKey.split("-");
-      const label = new Intl.DateTimeFormat("en-CA", {
-        year: "numeric",
-        month: "short",
-      }).format(new Date(Number(y), Number(m) - 1));
-
-      const point: AuditScoreDataPoint = { date: label };
-      const monthData = auditByMonthStore[monthKey];
-      for (const storeName of sortedStoreNames) {
-        const entry = monthData[storeName];
-        if (entry) {
-          point[storeName] = Math.round((entry.sum / entry.count) * 100) / 100;
-        }
-      }
-      return point;
-    });
-
-  // ══════════════════════════════════════════════
-  // 3. AUDIT RANKING
-  // ══════════════════════════════════════════════
-  const storeAuditAgg: Record<
-    string,
-    { totalScore: number; count: number; lastDate: string }
-  > = {};
-  for (const audit of completedAudits) {
-    if (audit.score === null) continue;
-    const storeName = storeNameMap[audit.store_id] ?? "Unknown";
-    const existing = storeAuditAgg[storeName] ?? {
-      totalScore: 0,
-      count: 0,
-      lastDate: "",
-    };
-    existing.totalScore += audit.score;
-    existing.count++;
-    if (audit.conducted_at && audit.conducted_at > existing.lastDate) {
-      existing.lastDate = audit.conducted_at;
-    }
-    storeAuditAgg[storeName] = existing;
-  }
-
-  const auditRanking = Object.entries(storeAuditAgg)
-    .map(([storeName, data]) => {
-      const avgScore = data.totalScore / data.count;
-      const lastDate = data.lastDate ? new Date(data.lastDate) : null;
-      const daysSince = lastDate
-        ? Math.floor(
-            (Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24),
-          )
-        : null;
-      return { storeName, avgScore, count: data.count, lastDate: data.lastDate, daysSince };
-    })
-    .sort((a, b) => b.avgScore - a.avgScore);
-
-  // ══════════════════════════════════════════════
-  // 4. ORDER VALUE CHART (last 12 months, per store)
+  // 2. ORDER VALUE CHART (last 12 months, per store)
   // ══════════════════════════════════════════════
   const recentOrders = orders.filter(
     (o) => o.created_at >= twelveMonthsAgoISO,
@@ -289,7 +214,6 @@ export default async function DashboardPage() {
       (orderTotals[order.id] ?? 0);
   }
 
-  // Generate all 12 months even if empty
   const orderValueChartData: OrderValueDataPoint[] = [];
   for (let i = 11; i >= 0; i--) {
     const d = new Date();
@@ -309,11 +233,113 @@ export default async function DashboardPage() {
   }
 
   // ══════════════════════════════════════════════
-  // 5. TOP CATEGORIES & PRODUCTS (by store + "all")
+  // 3. AUDIT RANKING (with per-store score history + total order value)
+  // ══════════════════════════════════════════════
+
+  // Total order value per store (all time)
+  const storeOrderValue: Record<string, number> = {};
+  for (const order of orders) {
+    const storeName = storeNameMap[order.store_id] ?? "Unknown";
+    storeOrderValue[storeName] =
+      (storeOrderValue[storeName] ?? 0) + (orderTotals[order.id] ?? 0);
+  }
+
+  // Audit aggregation per store
+  const storeAuditAgg: Record<
+    string,
+    {
+      totalScore: number;
+      count: number;
+      lastDate: string;
+      history: { monthKey: string; sum: number; count: number }[];
+    }
+  > = {};
+
+  // Per-store per-month scores for history chart
+  const storeMonthScores: Record<
+    string,
+    Record<string, { sum: number; count: number }>
+  > = {};
+
+  for (const audit of completedAudits) {
+    if (audit.score === null || !audit.conducted_at) continue;
+    const storeName = storeNameMap[audit.store_id] ?? "Unknown";
+
+    const existing = storeAuditAgg[storeName] ?? {
+      totalScore: 0,
+      count: 0,
+      lastDate: "",
+      history: [],
+    };
+    existing.totalScore += audit.score;
+    existing.count++;
+    if (audit.conducted_at > existing.lastDate) {
+      existing.lastDate = audit.conducted_at;
+    }
+    storeAuditAgg[storeName] = existing;
+
+    // Monthly scores
+    const d = new Date(audit.conducted_at);
+    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    if (!storeMonthScores[storeName]) storeMonthScores[storeName] = {};
+    const monthEntry = storeMonthScores[storeName][monthKey] ?? {
+      sum: 0,
+      count: 0,
+    };
+    monthEntry.sum += audit.score;
+    monthEntry.count++;
+    storeMonthScores[storeName][monthKey] = monthEntry;
+  }
+
+  const auditRanking: AuditRankingRow[] = Object.entries(storeAuditAgg)
+    .map(([storeName, data]) => {
+      const avgScore = data.totalScore / data.count;
+      const lastDate = data.lastDate ? new Date(data.lastDate) : null;
+      const daysSince = lastDate
+        ? Math.floor(
+            (Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24),
+          )
+        : null;
+
+      // Build score history for this store
+      const monthScores = storeMonthScores[storeName] ?? {};
+      const scoreHistory: AuditScoreDataPoint[] = Object.keys(monthScores)
+        .sort()
+        .map((mk) => {
+          const [y, m] = mk.split("-");
+          const label = new Intl.DateTimeFormat("en-CA", {
+            year: "numeric",
+            month: "short",
+          }).format(new Date(Number(y), Number(m) - 1));
+          const entry = monthScores[mk];
+          return {
+            date: label,
+            score: Math.round((entry.sum / entry.count) * 100) / 100,
+          };
+        });
+
+      return {
+        storeName,
+        avgScore,
+        count: data.count,
+        lastDate: data.lastDate,
+        daysSince,
+        totalOrderValue: storeOrderValue[storeName] ?? 0,
+        scoreHistory,
+        color: storeColors[storeName] ?? "#3b82f6",
+      };
+    })
+    .sort((a, b) => b.avgScore - a.avgScore);
+
+  // ══════════════════════════════════════════════
+  // 4. TOP CATEGORIES & PRODUCTS (by store + "all")
   // ══════════════════════════════════════════════
   const productAgg: Record<
     string,
-    Record<string, { name: string; modifier: string; quantity: number; value: number }>
+    Record<
+      string,
+      { name: string; modifier: string; quantity: number; value: number }
+    >
   > = { all: {} };
   const categoryAgg: Record<
     string,
@@ -330,16 +356,13 @@ export default async function DashboardPage() {
     if (!storeId) continue;
 
     const productKey = `${item.product_name}|${item.modifier}`;
-    const catName =
-      productCategoryMap[productKey] ?? "Uncategorized";
+    const catName = productCategoryMap[productKey] ?? "Uncategorized";
     const lineValue = Number(item.unit_price) * item.quantity;
 
-    // Aggregate for "all" and for the specific store
     for (const bucket of ["all", storeId]) {
       if (!productAgg[bucket]) productAgg[bucket] = {};
       if (!categoryAgg[bucket]) categoryAgg[bucket] = {};
 
-      // Products
       const pEntry = productAgg[bucket][productKey] ?? {
         name: item.product_name,
         modifier: item.modifier,
@@ -350,7 +373,6 @@ export default async function DashboardPage() {
       pEntry.value += lineValue;
       productAgg[bucket][productKey] = pEntry;
 
-      // Categories
       const cEntry = categoryAgg[bucket][catName] ?? {
         name: catName,
         quantity: 0,
@@ -362,7 +384,6 @@ export default async function DashboardPage() {
     }
   }
 
-  // Convert to sorted arrays, top 10
   const productsByStore: Record<string, ProductAggregate[]> = {};
   const categoriesByStore: Record<string, CategoryAggregate[]> = {};
 
@@ -403,8 +424,12 @@ export default async function DashboardPage() {
             >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <div className={`rounded-full ${config.bg} ${config.hoverBg} p-2.5 transition-colors`}>
-                    <Icon className={`size-4 ${config.color} ${config.hoverColor} transition-colors`} />
+                  <div
+                    className={`rounded-full ${config.bg} ${config.hoverBg} p-2.5 transition-colors`}
+                  >
+                    <Icon
+                      className={`size-4 ${config.color} ${config.hoverColor} transition-colors`}
+                    />
                   </div>
                   <span className="text-3xl font-bold tabular-nums">
                     {count}
@@ -425,104 +450,23 @@ export default async function DashboardPage() {
         })}
       </div>
 
-      {/* ══ 2. Audit Score Over Time ══ */}
-      <AuditScoreChart
-        data={auditChartData}
-        storeNames={sortedStoreNames}
-        colors={storeColors}
-      />
-
-      {/* ══ 3. Audit Ranking ══ */}
-      <Card>
-        <CardContent className="p-5">
-          <h2 className="text-lg font-semibold mb-4">Audit Ranking</h2>
-          {auditRanking.length === 0 ? (
-            <div className="text-center py-8">
-              <ClipboardCheck className="mx-auto size-10 text-muted-foreground/40 mb-2" />
-              <p className="text-sm text-muted-foreground">
-                No completed audits yet.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left">
-                    <th className="pb-2 font-medium w-12">#</th>
-                    <th className="pb-2 font-medium">Store</th>
-                    <th className="pb-2 font-medium text-center">Audits</th>
-                    <th className="pb-2 font-medium text-center">Avg Score</th>
-                    <th className="pb-2 font-medium text-right">Last Audit</th>
-                    <th className="pb-2 font-medium text-right">
-                      Days Since
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {auditRanking.map((row, idx) => (
-                    <tr key={row.storeName}>
-                      <td className="py-2.5">
-                        <span
-                          className={`flex items-center justify-center size-7 rounded-full text-xs font-bold ${
-                            idx === 0
-                              ? "bg-primary text-white"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          {idx + 1}
-                        </span>
-                      </td>
-                      <td className="py-2.5 font-medium">{row.storeName}</td>
-                      <td className="py-2.5 text-center text-muted-foreground">
-                        {row.count}
-                      </td>
-                      <td className="py-2.5 text-center">
-                        <Badge
-                          variant="outline"
-                          className={getScoreColor(row.avgScore)}
-                        >
-                          {row.avgScore.toFixed(1)}%
-                        </Badge>
-                      </td>
-                      <td className="py-2.5 text-right text-muted-foreground">
-                        {row.lastDate
-                          ? dateFmt.format(new Date(row.lastDate))
-                          : "—"}
-                      </td>
-                      <td className="py-2.5 text-right">
-                        {row.daysSince !== null ? (
-                          <span
-                            className={
-                              row.daysSince > 30
-                                ? "text-red-500/80 font-medium"
-                                : row.daysSince > 14
-                                  ? "text-amber-500/80 font-medium"
-                                  : "text-muted-foreground"
-                            }
-                          >
-                            {row.daysSince}d
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ══ 4. Monthly Order Value ══ */}
+      {/* ══ 2. Monthly Order Value (bar chart with store filter) ══ */}
       <OrderValueChart
         data={orderValueChartData}
+        stores={stores
+          .map((s) => ({ id: s.id, name: s.name }))
+          .sort((a, b) => a.name.localeCompare(b.name))}
         storeNames={sortedStoreNames}
         colors={storeColors}
       />
 
-      {/* ══ 5. Top Categories & Products ══ */}
+      {/* ══ 3. Audit Ranking (with expandable per-store score chart) ══ */}
+      <AuditRankingSection
+        rows={auditRanking}
+        dateFmt={dateFmt.format(new Date())}
+      />
+
+      {/* ══ 4. Top Categories & Products ══ */}
       <TopProductsSection
         stores={stores
           .map((s) => ({ id: s.id, name: s.name }))
