@@ -21,9 +21,10 @@ import { deleteAudit } from "@/app/(dashboard)/audits/actions";
 interface DeleteAuditButtonProps {
   auditId: string;
   auditLabel: string;
+  redirectTo?: string;
 }
 
-export function DeleteAuditButton({ auditId, auditLabel }: DeleteAuditButtonProps) {
+export function DeleteAuditButton({ auditId, auditLabel, redirectTo }: DeleteAuditButtonProps) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -35,7 +36,11 @@ export function DeleteAuditButton({ auditId, auditLabel }: DeleteAuditButtonProp
         return;
       }
       toast.success("Audit deleted.");
-      router.refresh();
+      if (redirectTo) {
+        router.push(redirectTo);
+      } else {
+        router.refresh();
+      }
     });
   };
 
@@ -47,12 +52,12 @@ export function DeleteAuditButton({ auditId, auditLabel }: DeleteAuditButtonProp
           variant="ghost"
           size="icon"
           className="size-8 text-muted-foreground hover:text-destructive shrink-0"
-          onClick={(e) => e.preventDefault()}
+          onClick={(e) => e.stopPropagation()}
         >
           <Trash2 className="size-4" />
         </Button>
       </AlertDialogTrigger>
-      <AlertDialogContent>
+      <AlertDialogContent onClick={(e) => e.stopPropagation()}>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Audit</AlertDialogTitle>
           <AlertDialogDescription>

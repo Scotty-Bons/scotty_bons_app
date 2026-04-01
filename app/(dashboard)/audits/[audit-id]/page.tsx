@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { DeleteAuditButton } from "@/components/audits/delete-audit-button";
 import { ExportAuditPdfButton } from "@/components/audits/export-audit-pdf-button";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -42,6 +43,7 @@ export default async function AuditDetailPage({
   if (!profile) redirect("/login");
 
   const role = profile.role;
+  const isAdmin = role === "admin";
   const canConduct = role === "admin" || role === "commissary";
 
   // Fetch audit
@@ -195,6 +197,13 @@ export default async function AuditDetailPage({
                 Conduct
               </Link>
             </Button>
+          )}
+          {isAdmin && (
+            <DeleteAuditButton
+              auditId={auditId}
+              auditLabel={`${template?.name ?? "Audit"} — ${store?.name ?? "Unknown Store"}`}
+              redirectTo="/audits"
+            />
           )}
         </div>
       </div>
