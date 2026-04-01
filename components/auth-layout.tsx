@@ -25,8 +25,8 @@ export function AuthLayout({ children, showHero = false }: AuthLayoutProps) {
             <Image
               src="/logo_scottybons.png"
               alt="ScottyBons"
-              width={200}
-              height={46}
+              width={260}
+              height={60}
               sizes="(min-width: 1024px) 280px, 200px"
               className="drop-shadow-lg lg:scale-140"
               priority
