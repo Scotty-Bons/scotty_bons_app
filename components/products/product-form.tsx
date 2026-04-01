@@ -95,35 +95,39 @@ export function ProductForm({ categories, product, defaultCategoryId, onSuccess 
   const onSubmit = (values: CreateProductValues) => {
     setFormError(null);
     startTransition(async () => {
-      const result = isEditing
-        ? await updateProduct(product.id, values)
-        : await createProduct(values);
-      if (result.error) {
-        setFormError(result.error);
-        return;
-      }
-
-      const productId = isEditing ? product.id : (result.data as { id: string })?.id;
-      if (productId) {
-        if (imageFile) {
-          const fd = new FormData();
-          fd.append("file", imageFile);
-          const imgResult = await uploadProductImage(productId, fd);
-          if (imgResult.error) {
-            toast.warning(imgResult.error);
-          }
-        } else if (removeImage && isEditing) {
-          await removeProductImage(productId);
+      try {
+        const result = isEditing
+          ? await updateProduct(product.id, values)
+          : await createProduct(values);
+        if (result.error) {
+          setFormError(result.error);
+          return;
         }
-      }
 
-      form.reset();
-      setPriceDisplays({});
-      setImageFile(null);
-      setImagePreview(null);
-      setRemoveImage(false);
-      toast.success(isEditing ? "Product updated." : "Product created.");
-      onSuccess();
+        const productId = isEditing ? product.id : (result.data as { id: string })?.id;
+        if (productId) {
+          if (imageFile) {
+            const fd = new FormData();
+            fd.append("file", imageFile);
+            const imgResult = await uploadProductImage(productId, fd);
+            if (imgResult.error) {
+              toast.warning(imgResult.error);
+            }
+          } else if (removeImage && isEditing) {
+            await removeProductImage(productId);
+          }
+        }
+
+        form.reset();
+        setPriceDisplays({});
+        setImageFile(null);
+        setImagePreview(null);
+        setRemoveImage(false);
+        toast.success(isEditing ? "Product updated." : "Product created.");
+        onSuccess();
+      } catch {
+        setFormError("Something went wrong. Please try again.");
+      }
     });
   };
 
@@ -213,7 +217,7 @@ export function ProductForm({ categories, product, defaultCategoryId, onSuccess 
                           onBlur={() => {
                             f.onBlur();
                             const num = Number(priceDisplays[index]);
-                            if (!isNaN(num) && num > 0) {
+                            if (!isNaN(num) && num >= 0) {
                               const rounded =
                                 Math.round(num * 100) / 100;
                               f.onChange(rounded);
@@ -224,7 +228,7 @@ export function ProductForm({ categories, product, defaultCategoryId, onSuccess 
                             } else {
                               setPriceDisplays((prev) => ({
                                 ...prev,
-                                [index]: "",
+                                [index]: "0.00",
                               }));
                               f.onChange(0);
                             }

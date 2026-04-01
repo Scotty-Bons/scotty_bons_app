@@ -23,7 +23,7 @@ const modifierSchema = z.object({
     .max(50, "Modifier must be at most 50 characters."),
   price: z
     .number({ error: "Price must be a number." })
-    .positive("Price must be greater than zero.")
+    .nonnegative("Price must be zero or greater.")
     .max(99999999.99, "Price must be at most 99,999,999.99."),
   sort_order: z.number().int().min(0).optional(),
 });
