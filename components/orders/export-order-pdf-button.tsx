@@ -4,22 +4,16 @@ import { useState } from "react";
 import { FileDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import type { OrderPdfData, OrderPdfItem } from "@/lib/pdf/generate-order-pdf";
 
 interface ExportOrderPdfButtonProps {
-  order: { id: string; order_number: string; status: string; created_at: string };
-  items: {
-    product_name: string;
-    modifier: string;
-    quantity: number;
-    unit_price: number;
-  }[];
-  storeName: string;
+  order: OrderPdfData;
+  items: OrderPdfItem[];
 }
 
 export function ExportOrderPdfButton({
   order,
   items,
-  storeName,
 }: ExportOrderPdfButtonProps) {
   const [generating, setGenerating] = useState(false);
 
@@ -28,7 +22,7 @@ export function ExportOrderPdfButton({
     try {
       const { generateOrderPdf } = await import("@/lib/pdf/generate-order-pdf");
       const { downloadPdf } = await import("@/lib/pdf/download-pdf");
-      const blob = generateOrderPdf(order, items, storeName);
+      const blob = generateOrderPdf(order, items);
       const date = new Date().toISOString().slice(0, 10);
       downloadPdf(blob, `${order.order_number}-${date}.pdf`);
     } catch {
