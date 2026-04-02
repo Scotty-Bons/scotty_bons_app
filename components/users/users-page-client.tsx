@@ -300,6 +300,13 @@ export function UsersPageClient({
                 unassignedStoreUsers,
               )}
 
+            {/* ── Team section separator ── */}
+            <div className="bg-muted/60 px-4 py-2 border-t-2 border-border">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Team
+              </span>
+            </div>
+
             {/* Admins folder */}
             {renderFolder(
               "_admins",

@@ -115,17 +115,28 @@ export default async function OrderDetailPage({
     .maybeSingle();
   invoiceId = invoice?.id ?? null;
 
-  // Fetch financial settings for tax/fee calculation
+  // Fetch financial settings for tax/fee calculation + company info
   const { data: financialSettings } = await supabase
     .from("financial_settings")
     .select("key, value")
-    .in("key", ["hst_rate", "ad_royalties_fee"]);
+    .in("key", ["hst_rate", "ad_royalties_fee", "commissary_name", "commissary_address", "commissary_postal_code", "commissary_phone"]);
 
   const fsMap: Record<string, string> = {};
   for (const row of financialSettings ?? []) fsMap[row.key] = row.value;
 
   const hstRate = Number(fsMap.hst_rate ?? "13") / 100;
   const adRoyaltiesFee = Number(fsMap.ad_royalties_fee ?? "0");
+
+  const companyName = fsMap.commissary_name ?? null;
+  const companyAddress = [fsMap.commissary_address, fsMap.commissary_postal_code].filter(Boolean).join("\n") || null;
+  const companyPhone = fsMap.commissary_phone ?? null;
+
+  // Fetch store billing info for PDF
+  const { data: storeBilling } = await supabase
+    .from("stores")
+    .select("business_name, address, postal_code, phone, email")
+    .eq("id", order.store_id)
+    .single();
 
   // Calculate order total from items
   const subtotal = orderItems.reduce(
@@ -189,14 +200,32 @@ export default async function OrderDetailPage({
             role={profile.role}
           />
           <ExportOrderPdfButton
-            order={{ id: order.id, order_number: order.order_number, status: order.status, created_at: order.created_at }}
+            order={{
+              order_number: order.order_number,
+              status: order.status,
+              created_at: order.created_at,
+              company_name: companyName,
+              company_address: companyAddress,
+              company_tax_id: companyPhone,
+              store_name: storeName ?? "Store",
+              store_business_name: storeBilling?.business_name ?? null,
+              store_address: storeBilling?.address ?? null,
+              store_postal_code: storeBilling?.postal_code ?? null,
+              store_phone: storeBilling?.phone ?? null,
+              store_email: storeBilling?.email ?? null,
+              subtotal,
+              tax_rate: hstRate,
+              tax_amount: taxAmount,
+              ad_royalties_fee: adRoyaltiesFee,
+              grand_total: grandTotal,
+            }}
             items={orderItems.map((i) => ({
               product_name: i.product_name,
               modifier: i.modifier,
-              quantity: i.quantity,
               unit_price: Number(i.unit_price),
+              quantity: i.quantity,
+              line_total: Number(i.unit_price) * i.quantity,
             }))}
-            storeName={storeName ?? "Store"}
           />
           {invoiceId && (
             <Link href={`/invoices/${invoiceId}`}>

@@ -21,6 +21,7 @@ export default async function SettingsPage() {
     .single();
 
   const isAdmin = profile?.role === "admin";
+  if (!isAdmin) redirect("/orders");
 
   const financialSettings: Record<string, string> = {};
   if (isAdmin) {

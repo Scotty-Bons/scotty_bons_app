@@ -17,7 +17,7 @@ export function Header({ role, userName, userEmail }: HeaderProps) {
         <MobileSidebar role={role} />
         <Breadcrumbs />
       </div>
-      <UserMenu userName={userName} userEmail={userEmail} />
+      <UserMenu userName={userName} userEmail={userEmail} role={role} />
     </header>
   );
 }

@@ -12,6 +12,8 @@ import { AuditFilters } from "@/components/audits/audit-filters";
 import { DeleteAuditButton } from "@/components/audits/delete-audit-button";
 import { NewAuditDialog } from "@/components/audits/new-audit-dialog";
 
+const isValidDate = (d: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d));
 const isValidUUID = (u: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(u);
 
@@ -21,6 +23,8 @@ export default async function AuditsPage({
   searchParams: Promise<{
     status?: string;
     store_id?: string;
+    from?: string;
+    to?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -53,6 +57,10 @@ export default async function AuditsPage({
     role !== "store" && params.store_id && isValidUUID(params.store_id)
       ? params.store_id
       : undefined;
+  const fromFilter =
+    params.from && isValidDate(params.from) ? params.from : undefined;
+  const toFilter =
+    params.to && isValidDate(params.to) ? params.to : undefined;
 
   // Build query
   let query = supabase
@@ -67,6 +75,12 @@ export default async function AuditsPage({
   }
   if (storeFilter) {
     query = query.eq("store_id", storeFilter);
+  }
+  if (fromFilter) {
+    query = query.gte("created_at", fromFilter);
+  }
+  if (toFilter) {
+    query = query.lte("created_at", toFilter + "T23:59:59.999Z");
   }
 
   const { data: auditsRaw } = await query;
@@ -190,7 +204,7 @@ export default async function AuditsPage({
                 <div className="flex items-center min-w-0">
                   <Link
                     href={`/audits/${audit.id}`}
-                    className="flex flex-1 items-center gap-3 px-4 py-4 min-w-0"
+                    className="flex flex-1 items-center gap-3 px-4 py-3 min-w-0"
                   >
                     <div className="hidden sm:flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-light">
                       <ClipboardCheck className="size-5 text-primary" />
@@ -215,14 +229,14 @@ export default async function AuditsPage({
                         {formatDate(audit.created_at)}
                         {audit.conducted_by_name ? ` · by ${audit.conducted_by_name}` : ""}
                       </p>
-                      {isCompleted && audit.score !== null && (
-                        <span
-                          className={`inline-block text-xs sm:text-sm font-medium px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full border mt-1 ${getScoreColor(audit.score)}`}
-                        >
-                          {audit.score}% — {getScoreLabel(audit.score)}
-                        </span>
-                      )}
                     </div>
+                    {isCompleted && audit.score !== null && (
+                      <span
+                        className={`hidden sm:inline-block text-sm font-medium px-2.5 py-1 rounded-full border shrink-0 ${getScoreColor(audit.score)}`}
+                      >
+                        {audit.score}% — {getScoreLabel(audit.score)}
+                      </span>
+                    )}
                   </Link>
                   {isAdmin && (
                     <div className="pr-3 shrink-0">
@@ -233,6 +247,15 @@ export default async function AuditsPage({
                     </div>
                   )}
                 </div>
+                {isCompleted && audit.score !== null && (
+                  <div className="sm:hidden px-4 pb-3 -mt-1">
+                    <span
+                      className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full border ${getScoreColor(audit.score)}`}
+                    >
+                      {audit.score}% — {getScoreLabel(audit.score)}
+                    </span>
+                  </div>
+                )}
               </Card>
             );
           })}

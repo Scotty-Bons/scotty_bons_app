@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { INVOICE_LOGO_BASE64 } from "./invoice-logo";
 
 interface AuditPdfCategory {
   name: string;
@@ -19,23 +20,58 @@ export function generateAuditPdf(
 ): Blob {
   const doc = new jsPDF();
   const dateFmt = new Intl.DateTimeFormat("en-CA", { dateStyle: "long" });
+  const rightX = 196;
 
-  // Header
-  doc.setFontSize(18);
-  doc.text("Audit Report", 14, 22);
+  // ── Header: Logo + brand name (left) / Title + date (right) ──
+  doc.addImage(INVOICE_LOGO_BASE64, "PNG", 14, 11, 16, 16);
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(0);
+  doc.text("Scotty Bons", 32, 18);
+  doc.text("Caribbean Grill", 32, 24);
 
-  doc.setFontSize(11);
-  doc.text(`Store: ${storeName}`, 14, 32);
-  doc.text(`Template: ${templateName}`, 14, 39);
-  doc.text(`Conducted by: ${conductorName}`, 14, 46);
+  doc.setFontSize(13);
+  doc.text("Audit Report", rightX, 17, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(80);
   if (audit.conducted_at) {
-    doc.text(`Date: ${dateFmt.format(new Date(audit.conducted_at))}`, 14, 53);
-  }
-  if (audit.score !== null) {
-    doc.text(`Score: ${audit.score}%`, 14, 60);
+    doc.text(dateFmt.format(new Date(audit.conducted_at)), rightX, 23, {
+      align: "right",
+    });
   }
 
-  let startY = audit.score !== null ? 68 : 60;
+  // ── Score badge ──
+  if (audit.score !== null) {
+    const score = audit.score;
+    const sColor = score >= 80
+      ? { bg: [209, 250, 229] as [number, number, number], text: [6, 95, 70] as [number, number, number] }
+      : score >= 50
+        ? { bg: [255, 237, 213] as [number, number, number], text: [154, 52, 18] as [number, number, number] }
+        : { bg: [254, 226, 226] as [number, number, number], text: [153, 27, 27] as [number, number, number] };
+    const sLabel = `${score}%`;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    const badgeW = doc.getTextWidth(sLabel) + 8;
+    const badgeH = 6;
+    const badgeX = rightX - badgeW;
+    const badgeY = 26;
+    doc.setFillColor(...sColor.bg);
+    doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.5, 1.5, "F");
+    doc.setTextColor(...sColor.text);
+    doc.text(sLabel, badgeX + badgeW / 2, badgeY + 4.2, { align: "center" });
+  }
+
+  // ── Audit details ──
+  let y = 40;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(60);
+  doc.text(`Store: ${storeName}`, 14, y); y += 6;
+  doc.text(`Template: ${templateName}`, 14, y); y += 6;
+  doc.text(`Conducted by: ${conductorName}`, 14, y); y += 6;
+
+  let startY = y + 2;
 
   // Notes
   if (audit.notes) {

@@ -19,12 +19,9 @@ import {
   type AuditRankingRow,
   type AuditScoreDataPoint,
 } from "@/components/dashboard/audit-ranking-section";
-import {
-  TopProductsSection,
-  type ProductAggregate,
-  type CategoryAggregate,
-} from "@/components/dashboard/top-products-section";
+import { TopProductsSection } from "@/components/dashboard/top-products-section";
 import { DashboardDateFilter } from "@/components/dashboard/dashboard-date-filter";
+import { DashboardStoreFilter } from "@/components/dashboard/dashboard-store-filter";
 
 function getDateRange(range: string): { from: Date; label: string } {
   const now = new Date();
@@ -133,12 +130,28 @@ const STORE_PALETTE = [
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; from?: string; to?: string; store?: string }>;
 }) {
-  const { range: rangeParam } = await searchParams;
-  const rangeKey = rangeParam ?? "12m";
-  const { from: rangeFrom, label: rangeLabel } = getDateRange(rangeKey);
-  const rangeFromISO = rangeFrom.toISOString();
+  const { range: rangeParam, from: fromParam, to: toParam, store: storeParam } = await searchParams;
+
+  // Custom date range takes precedence over presets
+  const isCustomRange = !!(fromParam && toParam);
+  const rangeKey = isCustomRange ? "custom" : (rangeParam ?? "12m");
+
+  let rangeFrom: Date;
+  let rangeTo: Date | undefined;
+  let rangeLabel: string;
+
+  if (isCustomRange) {
+    rangeFrom = new Date(fromParam);
+    rangeTo = new Date(toParam + "T23:59:59.999Z");
+    const fmt = new Intl.DateTimeFormat("en-CA", { dateStyle: "medium" });
+    rangeLabel = `${fmt.format(rangeFrom)} – ${fmt.format(new Date(toParam))}`;
+  } else {
+    const result = getDateRange(rangeKey);
+    rangeFrom = result.from;
+    rangeLabel = result.label;
+  }
 
   const supabase = await createClient();
   const {
@@ -155,7 +168,60 @@ export default async function DashboardPage({
 
   if (!profile || profile.role !== "admin") redirect("/orders");
 
-  // ── Fetch all data in parallel (filtered by date range) ──
+  // ── Resolve "all" range to earliest data date ──
+  let resolvedRangeFrom = rangeFrom;
+  if (rangeKey === "all") {
+    const [earliestOrder, earliestAudit] = await Promise.all([
+      supabase
+        .from("orders")
+        .select("created_at")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .single(),
+      supabase
+        .from("audits")
+        .select("conducted_at")
+        .not("conducted_at", "is", null)
+        .order("conducted_at", { ascending: true })
+        .limit(1)
+        .single(),
+    ]);
+
+    const dates = [
+      earliestOrder.data?.created_at,
+      earliestAudit.data?.conducted_at,
+    ].filter(Boolean) as string[];
+
+    if (dates.length > 0) {
+      dates.sort();
+      resolvedRangeFrom = new Date(dates[0]);
+    }
+  }
+
+  const rangeFromISO = resolvedRangeFrom.toISOString();
+  const rangeToISO = rangeTo?.toISOString();
+
+  // ── Resolve store filter ──
+  const storeFilterId = storeParam ?? "all";
+
+  // ── Fetch all data in parallel (filtered by date range + store) ──
+  let ordersQuery = supabase
+    .from("orders")
+    .select("id, order_number, store_id, status, created_at")
+    .gte("created_at", rangeFromISO)
+    .order("created_at", { ascending: false });
+  if (rangeToISO) ordersQuery = ordersQuery.lte("created_at", rangeToISO);
+  if (storeFilterId !== "all") ordersQuery = ordersQuery.eq("store_id", storeFilterId);
+
+  let auditsQuery = supabase
+    .from("audits")
+    .select("id, store_id, score, conducted_at")
+    .not("conducted_at", "is", null)
+    .gte("conducted_at", rangeFromISO)
+    .order("conducted_at", { ascending: true });
+  if (rangeToISO) auditsQuery = auditsQuery.lte("conducted_at", rangeToISO);
+  if (storeFilterId !== "all") auditsQuery = auditsQuery.eq("store_id", storeFilterId);
+
   const [
     ordersResult,
     itemsResult,
@@ -164,21 +230,12 @@ export default async function DashboardPage({
     productsResult,
     categoriesResult,
   ] = await Promise.all([
-    supabase
-      .from("orders")
-      .select("id, order_number, store_id, status, created_at")
-      .gte("created_at", rangeFromISO)
-      .order("created_at", { ascending: false }),
+    ordersQuery,
     supabase
       .from("order_items")
       .select("order_id, product_name, modifier, unit_price, quantity"),
     supabase.from("stores").select("id, name"),
-    supabase
-      .from("audits")
-      .select("id, store_id, score, conducted_at")
-      .not("conducted_at", "is", null)
-      .gte("conducted_at", rangeFromISO)
-      .order("conducted_at", { ascending: true }),
+    auditsQuery,
     supabase.from("products").select("id, name, category_id, product_modifiers(label)"),
     supabase.from("product_categories").select("id, name"),
   ]);
@@ -225,7 +282,11 @@ export default async function DashboardPage({
   }
 
   const orderStoreMap: Record<string, string> = {};
-  for (const order of orders) orderStoreMap[order.id] = order.store_id;
+  const orderStatusMap: Record<string, string> = {};
+  for (const order of orders) {
+    orderStoreMap[order.id] = order.store_id;
+    orderStatusMap[order.id] = order.status;
+  }
 
   const orderTotals: Record<string, number> = {};
   for (const item of allItems) {
@@ -266,7 +327,7 @@ export default async function DashboardPage({
 
   // Generate month labels from rangeFrom to now
   const orderValueChartData: OrderValueDataPoint[] = [];
-  const chartStart = new Date(rangeFrom.getFullYear(), rangeFrom.getMonth(), 1);
+  const chartStart = new Date(resolvedRangeFrom.getFullYear(), resolvedRangeFrom.getMonth(), 1);
   const chartEnd = new Date();
   const cursor = new Date(chartStart);
   while (cursor <= chartEnd) {
@@ -385,71 +446,16 @@ export default async function DashboardPage({
     .sort((a, b) => b.avgScore - a.avgScore);
 
   // ══════════════════════════════════════════════
-  // 4. TOP CATEGORIES & PRODUCTS (by store + "all")
+  // 4. TOP STORES, CATEGORIES & PRODUCTS (raw items for client-side aggregation)
   // ══════════════════════════════════════════════
-  const productAgg: Record<
-    string,
-    Record<
-      string,
-      { name: string; modifier: string; quantity: number; value: number }
-    >
-  > = { all: {} };
-  const categoryAgg: Record<
-    string,
-    Record<string, { name: string; quantity: number; value: number }>
-  > = { all: {} };
-
-  for (const store of stores) {
-    productAgg[store.id] = {};
-    categoryAgg[store.id] = {};
-  }
-
-  for (const item of allItems) {
-    const storeId = orderStoreMap[item.order_id];
-    if (!storeId) continue;
-
-    const productKey = `${item.product_name}|${item.modifier}`;
-    const catName = productCategoryMap[productKey] ?? "Uncategorized";
-    const lineValue = Number(item.unit_price) * item.quantity;
-
-    for (const bucket of ["all", storeId]) {
-      if (!productAgg[bucket]) productAgg[bucket] = {};
-      if (!categoryAgg[bucket]) categoryAgg[bucket] = {};
-
-      const pEntry = productAgg[bucket][productKey] ?? {
-        name: item.product_name,
-        modifier: item.modifier,
-        quantity: 0,
-        value: 0,
-      };
-      pEntry.quantity += item.quantity;
-      pEntry.value += lineValue;
-      productAgg[bucket][productKey] = pEntry;
-
-      const cEntry = categoryAgg[bucket][catName] ?? {
-        name: catName,
-        quantity: 0,
-        value: 0,
-      };
-      cEntry.quantity += item.quantity;
-      cEntry.value += lineValue;
-      categoryAgg[bucket][catName] = cEntry;
-    }
-  }
-
-  const productsByStore: Record<string, ProductAggregate[]> = {};
-  const categoriesByStore: Record<string, CategoryAggregate[]> = {};
-
-  for (const key of Object.keys(productAgg)) {
-    productsByStore[key] = Object.values(productAgg[key])
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 10);
-  }
-  for (const key of Object.keys(categoryAgg)) {
-    categoriesByStore[key] = Object.values(categoryAgg[key])
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 10);
-  }
+  const rawItemsForTop = allItems.map((item) => ({
+    product_name: item.product_name,
+    modifier: item.modifier,
+    unit_price: Number(item.unit_price),
+    quantity: item.quantity,
+    status: orderStatusMap[item.order_id] ?? "",
+    store_name: storeNameMap[orderStoreMap[item.order_id]] ?? "Unknown",
+  }));
 
   // ── Formatting helpers ──
   const dateFmt = new Intl.DateTimeFormat("en-CA", { dateStyle: "medium" });
@@ -457,14 +463,24 @@ export default async function DashboardPage({
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {/* ── Header ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            {rangeLabel} &middot; {dateFmt.format(new Date())}
-          </p>
+      <div className="sticky -top-4 sm:-top-6 z-20 bg-background border-b -mx-4 px-4 pt-4 pb-3 sm:-mx-6 sm:px-6 sm:pt-6 -mt-4 sm:-mt-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Dashboard</h1>
+            <p className="text-sm text-muted-foreground">
+              {rangeLabel} &middot; {dateFmt.format(new Date())}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <DashboardStoreFilter
+              stores={stores
+                .map((s) => ({ id: s.id, name: s.name }))
+                .sort((a, b) => a.name.localeCompare(b.name))}
+              current={storeFilterId}
+            />
+            <DashboardDateFilter current={rangeKey} />
+          </div>
         </div>
-        <DashboardDateFilter current={rangeKey} />
       </div>
 
       {/* ══ 1. Order Status Cards ══ */}
@@ -509,11 +525,10 @@ export default async function DashboardPage({
       {/* ══ 2. Monthly Order Value (bar chart with store filter) ══ */}
       <OrderValueChart
         data={orderValueChartData}
-        stores={stores
-          .map((s) => ({ id: s.id, name: s.name }))
-          .sort((a, b) => a.name.localeCompare(b.name))}
         storeNames={sortedStoreNames}
         colors={storeColors}
+        rangeLabel={rangeLabel}
+        selectedStoreName={storeFilterId !== "all" ? storeNameMap[storeFilterId] : undefined}
       />
 
       {/* ══ 3. Audit Ranking (with expandable per-store score chart) ══ */}
@@ -527,14 +542,14 @@ export default async function DashboardPage({
         stores={stores
           .map((s) => ({ id: s.id, name: s.name }))
           .sort((a, b) => a.name.localeCompare(b.name))}
-        productsByStore={productsByStore}
-        categoriesByStore={categoriesByStore}
+        rawItems={rawItemsForTop}
         categoryNames={categories.map((c) => c.name).sort()}
         productNames={[...new Set(products.map((p) => p.name))].sort()}
-        productCategoryMap={Object.fromEntries(
-          products.map((p) => [p.name, categoryNameMap[p.category_id] ?? "Uncategorized"]),
-        )}
+        productCategoryMap={productCategoryMap}
         currentRange={rangeKey}
+        currentStoreFilter={storeFilterId}
+        currentDateFrom={fromParam}
+        currentDateTo={toParam}
       />
     </div>
   );

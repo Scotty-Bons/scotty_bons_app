@@ -22,8 +22,16 @@ interface ExportTopProductsDialogProps {
   productCategoryMap: Record<string, string>;
   /** Pre-selected store ID from the dashboard filter */
   currentStoreFilter: string;
-  /** Dashboard date range key (e.g., "12m") */
+  /** Dashboard date range key (e.g., "12m", "custom") */
   currentRange: string;
+  /** Pre-selected category name from the dashboard filter */
+  currentCategoryFilter?: string;
+  /** Pre-selected product name from the dashboard filter */
+  currentProductFilter?: string;
+  /** Custom date range from URL (YYYY-MM-DD) */
+  currentDateFrom?: string;
+  /** Custom date range from URL (YYYY-MM-DD) */
+  currentDateTo?: string;
 }
 
 function rangeKeyToDates(key: string): { from: string; to: string } {
@@ -35,7 +43,11 @@ function rangeKeyToDates(key: string): { from: string; to: string } {
     case "30d": d.setDate(d.getDate() - 30); break;
     case "3m": d.setMonth(d.getMonth() - 3); break;
     case "6m": d.setMonth(d.getMonth() - 6); break;
-    case "all": return { from: "2020-01-01", to };
+    case "all": {
+      const a = new Date();
+      a.setFullYear(a.getFullYear() - 10);
+      return { from: a.toISOString().slice(0, 10), to };
+    }
     case "12m":
     default: d.setMonth(d.getMonth() - 12); break;
   }
@@ -49,18 +61,29 @@ export function ExportTopProductsDialog({
   productCategoryMap,
   currentStoreFilter,
   currentRange,
+  currentCategoryFilter,
+  currentProductFilter,
+  currentDateFrom,
+  currentDateTo,
 }: ExportTopProductsDialogProps) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const defaultDates = rangeKeyToDates(currentRange);
+  // Use custom dates if provided, otherwise derive from range key
+  const defaultDates = currentRange === "custom" && currentDateFrom && currentDateTo
+    ? { from: currentDateFrom, to: currentDateTo }
+    : rangeKeyToDates(currentRange);
   const [dateFrom, setDateFrom] = useState(defaultDates.from);
   const [dateTo, setDateTo] = useState(defaultDates.to);
   const [selectedStoreIds, setSelectedStoreIds] = useState<Set<string>>(
     currentStoreFilter !== "all" ? new Set([currentStoreFilter]) : new Set(),
   );
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
-  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
+    currentCategoryFilter && currentCategoryFilter !== "all" ? new Set([currentCategoryFilter]) : new Set(),
+  );
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(
+    currentProductFilter && currentProductFilter !== "all" ? new Set([currentProductFilter]) : new Set(),
+  );
 
   const toggleSet = (set: Set<string>, value: string): Set<string> => {
     const next = new Set(set);
@@ -111,7 +134,32 @@ export function ExportTopProductsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => {
+      if (v) {
+        // Sync dialog state with current filters on open
+        const dates = currentRange === "custom" && currentDateFrom && currentDateTo
+          ? { from: currentDateFrom, to: currentDateTo }
+          : rangeKeyToDates(currentRange);
+        setDateFrom(dates.from);
+        setDateTo(dates.to);
+        setSelectedStoreIds(
+          currentStoreFilter !== "all"
+            ? new Set([currentStoreFilter])
+            : new Set(stores.map((s) => s.id)),
+        );
+        setSelectedCategories(
+          currentCategoryFilter && currentCategoryFilter !== "all"
+            ? new Set([currentCategoryFilter])
+            : new Set(categoryNames),
+        );
+        setSelectedProducts(
+          currentProductFilter && currentProductFilter !== "all"
+            ? new Set([currentProductFilter])
+            : new Set(productNames),
+        );
+      }
+      setOpen(v);
+    }}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <FileDown className="size-4 mr-1.5" />
@@ -228,7 +276,11 @@ export function ExportTopProductsDialog({
           {/* Products */}
           {(() => {
             const visibleProducts = selectedCategories.size > 0
-              ? productNames.filter((n) => selectedCategories.has(productCategoryMap[n] ?? ""))
+              ? productNames.filter((n) => {
+                  // Find category for this product name (keys are "name|modifier")
+                  const cat = Object.entries(productCategoryMap).find(([k]) => k.startsWith(n + "|"))?.[1];
+                  return selectedCategories.has(cat ?? "");
+                })
               : productNames;
             return (<div>
             <div className="flex items-center justify-between mb-1.5">

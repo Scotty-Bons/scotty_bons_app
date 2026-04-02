@@ -5,6 +5,7 @@ import type { ActionResult } from "@/lib/types";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import { INVOICE_LOGO_BASE64 } from "@/lib/pdf/invoice-logo";
 
 interface ExportParams {
   dateFrom: string;
@@ -40,11 +41,10 @@ export async function exportTopProductsReport(
     return { data: null, error: "Unauthorized." };
   }
 
-  // 1. Fetch fulfilled orders in date range
+  // 1. Fetch orders in date range (all statuses, matching dashboard)
   let ordersQuery = supabase
     .from("orders")
     .select("id, store_id")
-    .eq("status", "fulfilled")
     .gte("created_at", params.dateFrom)
     .lte("created_at", params.dateTo + "T23:59:59");
 
@@ -54,7 +54,7 @@ export async function exportTopProductsReport(
 
   const { data: orders } = await ordersQuery;
   if (!orders || orders.length === 0) {
-    return { data: null, error: "No fulfilled orders found for the selected filters." };
+    return { data: null, error: "No orders found for the selected filters." };
   }
 
   const orderIds = orders.map((o) => o.id);
@@ -171,29 +171,61 @@ function generatePdf(
 ): Buffer {
   const doc = new jsPDF();
   const fmt = (v: number) => `$${v.toFixed(2)}`;
+  const rightX = 196;
 
-  doc.setFontSize(16);
+  // ── Header: Logo + brand name (left) / Title + period (right) ──
+  doc.addImage(INVOICE_LOGO_BASE64, "PNG", 14, 11, 16, 16);
+  doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text("Products Report", 14, 18);
-  doc.setFontSize(10);
+  doc.setTextColor(0);
+  doc.text("Scotty Bons", 32, 18);
+  doc.text("Caribbean Grill", 32, 24);
+
+  doc.setFontSize(13);
+  doc.text("Products Report", rightX, 17, { align: "right" });
   doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
   doc.setTextColor(80);
-  doc.text(`Period: ${dateLabel}`, 14, 25);
-  doc.text(`Stores: ${storeNames.join(", ")}`, 14, 31);
+  doc.text(dateLabel, rightX, 23, { align: "right" });
+
+  // ── Details ──
+  let y = 38;
+  doc.setFontSize(10);
+  doc.setTextColor(60);
+  doc.text(`Stores: ${storeNames.join(", ")}`, 14, y);
+  y += 6;
+  doc.text(`${products.length} product${products.length !== 1 ? "s" : ""}`, 14, y);
+  y += 8;
+
+  const totalQty = products.reduce((sum, p) => sum + p.quantity, 0);
+  const totalValue = products.reduce((sum, p) => sum + p.value, 0);
 
   autoTable(doc, {
-    startY: 38,
+    startY: y,
     head: [["#", "Product", "Modifier", "Qty", "Value"]],
-    body: products.map((p, i) => [
-      (i + 1).toString(),
-      p.name,
-      p.modifier ?? "",
-      p.quantity.toString(),
-      fmt(p.value),
-    ]),
+    body: [
+      ...products.map((p, i) => [
+        (i + 1).toString(),
+        p.name,
+        p.modifier ?? "",
+        p.quantity.toString(),
+        fmt(p.value),
+      ]),
+      ["", "", "Total", totalQty.toString(), fmt(totalValue)],
+    ],
     theme: "striped",
     headStyles: { fillColor: [24, 24, 27] },
     columnStyles: { 0: { cellWidth: 12 }, 3: { halign: "right" }, 4: { halign: "right" } },
+    didParseCell: (data) => {
+      if (data.section === "head") {
+        if (data.column.index === 3) data.cell.styles.halign = "right";
+        if (data.column.index === 4) data.cell.styles.halign = "right";
+      }
+      // Bold total row
+      if (data.section === "body" && data.row.index === products.length) {
+        data.cell.styles.fontStyle = "bold";
+      }
+    },
   });
 
   return Buffer.from(doc.output("arraybuffer"));

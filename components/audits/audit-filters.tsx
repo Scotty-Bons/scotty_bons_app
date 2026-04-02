@@ -24,8 +24,10 @@ export function AuditFilters({ role, stores }: AuditFiltersProps) {
 
   const currentStatus = searchParams.get("status") ?? "";
   const currentStoreId = searchParams.get("store_id") ?? "";
+  const currentFrom = searchParams.get("from") ?? "";
+  const currentTo = searchParams.get("to") ?? "";
 
-  const hasFilters = !!(currentStatus || currentStoreId);
+  const hasFilters = !!(currentStatus || currentStoreId || currentFrom || currentTo);
 
   function updateParams(updates: Record<string, string>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -69,6 +71,32 @@ export function AuditFilters({ role, stores }: AuditFiltersProps) {
             <SelectItem value="completed">Completed</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="w-[calc(50%-6px)] sm:w-auto sm:min-w-[140px]">
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">
+          From
+        </label>
+        <input
+          type="date"
+
+          value={currentFrom}
+          onChange={(e) => updateParams({ from: e.target.value })}
+          className="flex h-10 w-full rounded-xl border border-input bg-muted/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary"
+        />
+      </div>
+
+      <div className="w-[calc(50%-6px)] sm:w-auto sm:min-w-[140px]">
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">
+          To
+        </label>
+        <input
+          type="date"
+
+          value={currentTo}
+          onChange={(e) => updateParams({ to: e.target.value })}
+          className="flex h-10 w-full rounded-xl border border-input bg-muted/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary"
+        />
       </div>
 
       {role !== "store" && stores.length > 0 && (

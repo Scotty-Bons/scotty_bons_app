@@ -17,9 +17,10 @@ import Link from "next/link";
 interface UserMenuProps {
   userName: string;
   userEmail: string;
+  role: string;
 }
 
-export function UserMenu({ userName, userEmail }: UserMenuProps) {
+export function UserMenu({ userName, userEmail, role }: UserMenuProps) {
   const router = useRouter();
 
   const initials = userName
@@ -57,12 +58,14 @@ export function UserMenu({ userName, userEmail }: UserMenuProps) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild className="rounded-lg">
-          <Link href="/settings">
-            <Settings className="size-4 mr-2" />
-            Settings
-          </Link>
-        </DropdownMenuItem>
+        {role === "admin" && (
+          <DropdownMenuItem asChild className="rounded-lg">
+            <Link href="/settings">
+              <Settings className="size-4 mr-2" />
+              Settings
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={handleSignOut} className="rounded-lg text-primary focus:text-primary">
           <LogOut className="size-4 mr-2" />
           Logout
