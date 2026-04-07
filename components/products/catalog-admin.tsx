@@ -243,9 +243,9 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                 return (
                   <div key={category.id}>
                     {/* Category row */}
-                    <div className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between px-2 sm:px-4 py-3 hover:bg-muted/50 transition-colors">
                       <button
-                        className="flex items-center gap-3 flex-1 text-left"
+                        className="flex items-center gap-2 sm:gap-3 flex-1 text-left min-w-0"
                         onClick={() => toggleExpanded(category.id)}
                       >
                         {isOpen ? (
@@ -258,8 +258,8 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                         ) : (
                           <FolderClosed className="size-4 text-muted-foreground shrink-0" />
                         )}
-                        <div>
-                          <span className="text-sm font-semibold">
+                        <div className="min-w-0">
+                          <span className="text-sm font-semibold truncate block">
                             {category.name}
                           </span>
                           <p className="text-xs text-muted-foreground">
@@ -268,11 +268,11 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                           </p>
                         </div>
                       </button>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-7"
+                          className="size-7 hidden sm:inline-flex"
                           title="Move up"
                           disabled={catIndex === 0 || isReordering}
                           onClick={() => handleMoveCategory(catIndex, "up")}
@@ -282,7 +282,7 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-7"
+                          className="size-7 hidden sm:inline-flex"
                           title="Move down"
                           disabled={catIndex === categories.length - 1 || isReordering}
                           onClick={() => handleMoveCategory(catIndex, "down")}
@@ -292,7 +292,7 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-8"
+                          className="size-7 sm:size-8"
                           title="Add product to this category"
                           onClick={() => openCreateProduct(category.id)}
                         >
@@ -300,12 +300,28 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                         </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="size-8">
+                            <Button variant="ghost" size="icon" className="size-7 sm:size-8">
                               <MoreHorizontal className="size-4" />
                               <span className="sr-only">Category actions</span>
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              className="sm:hidden"
+                              disabled={catIndex === 0 || isReordering}
+                              onClick={() => handleMoveCategory(catIndex, "up")}
+                            >
+                              <ArrowUp className="size-4 mr-2" />
+                              Move up
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="sm:hidden"
+                              disabled={catIndex === categories.length - 1 || isReordering}
+                              onClick={() => handleMoveCategory(catIndex, "down")}
+                            >
+                              <ArrowDown className="size-4 mr-2" />
+                              Move down
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setEditingCategory(category)}>
                               <Pencil className="size-4 mr-2" />
                               Edit
@@ -334,9 +350,9 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                             {catProducts.map((product, prodIndex) => (
                               <div
                                 key={product.id}
-                                className="flex items-center justify-between pl-14 pr-4 py-2.5"
+                                className="flex items-center justify-between pl-6 sm:pl-14 pr-2 sm:pr-4 py-2.5"
                               >
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                                   {product.image_url ? (
                                     <div className="relative size-8 shrink-0 rounded overflow-hidden bg-muted">
                                       <Image
@@ -348,24 +364,24 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                                       />
                                     </div>
                                   ) : (
-                                    <Package className="size-4 text-muted-foreground" />
+                                    <Package className="size-4 text-muted-foreground shrink-0" />
                                   )}
-                                  <div>
-                                    <span className="text-sm font-medium">
+                                  <div className="min-w-0">
+                                    <span className="text-sm font-medium truncate block">
                                       {product.name}
                                     </span>
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className="text-xs text-muted-foreground truncate">
                                       {product.modifiers.map((m) =>
                                         `${m.label} ${formatPrice(m.price)}`
                                       ).join(" · ")}
                                     </p>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="size-7"
+                                  className="size-7 hidden sm:inline-flex"
                                   title="Move up"
                                   disabled={prodIndex === 0 || isReordering}
                                   onClick={() => handleMoveProduct(category.id, prodIndex, "up")}
@@ -375,7 +391,7 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="size-7"
+                                  className="size-7 hidden sm:inline-flex"
                                   title="Move down"
                                   disabled={prodIndex === catProducts.length - 1 || isReordering}
                                   onClick={() => handleMoveProduct(category.id, prodIndex, "down")}
@@ -384,12 +400,28 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                                 </Button>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="size-8">
+                                    <Button variant="ghost" size="icon" className="size-7 sm:size-8">
                                       <MoreHorizontal className="size-4" />
                                       <span className="sr-only">Product actions</span>
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      className="sm:hidden"
+                                      disabled={prodIndex === 0 || isReordering}
+                                      onClick={() => handleMoveProduct(category.id, prodIndex, "up")}
+                                    >
+                                      <ArrowUp className="size-4 mr-2" />
+                                      Move up
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="sm:hidden"
+                                      disabled={prodIndex === catProducts.length - 1 || isReordering}
+                                      onClick={() => handleMoveProduct(category.id, prodIndex, "down")}
+                                    >
+                                      <ArrowDown className="size-4 mr-2" />
+                                      Move down
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => setEditingProduct(product)}>
                                       <Pencil className="size-4 mr-2" />
                                       Edit
