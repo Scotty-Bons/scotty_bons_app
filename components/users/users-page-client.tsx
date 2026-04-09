@@ -7,8 +7,10 @@ import {
   ChevronRight,
   FolderClosed,
   FolderOpen,
+  MapPin,
   MoreHorizontal,
   Pencil,
+  Phone,
   Plus,
   Shield,
   Store,
@@ -133,15 +135,16 @@ export function UsersPageClient({
     subtitle: string,
     members: UserRow[],
     actions?: React.ReactNode,
+    details?: React.ReactNode,
   ) => {
     const isOpen = expandedStores.has(id);
     return (
       <div key={id}>
         {/* Folder row */}
-        <div className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors">
+        <div className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors gap-2">
           <button
             type="button"
-            className="flex items-center gap-3 flex-1 text-left"
+            className="flex items-center gap-3 flex-1 text-left min-w-0"
             onClick={() => toggleStore(id)}
           >
             {isOpen ? (
@@ -154,12 +157,17 @@ export function UsersPageClient({
             ) : (
               <FolderClosed className="size-4 text-muted-foreground shrink-0" />
             )}
-            <div>
+            <div className="min-w-0">
               <span className="text-sm font-semibold">{label}</span>
               <p className="text-xs text-muted-foreground">{subtitle}</p>
             </div>
           </button>
-          <div className="flex items-center gap-1">
+          {details && (
+            <div className="hidden md:flex items-center gap-4 text-xs text-muted-foreground shrink-0">
+              {details}
+            </div>
+          )}
+          <div className="flex items-center gap-1 shrink-0">
             {icon}
             {actions}
           </div>
@@ -258,6 +266,7 @@ export function UsersPageClient({
             {/* Store folders */}
             {stores.map((store) => {
               const members = getUsersForStore(store.id);
+              const storeDetails = [store.phone, store.address, store.postal_code].filter(Boolean);
               return renderFolder(
                 store.id,
                 null,
@@ -287,6 +296,25 @@ export function UsersPageClient({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </>,
+                storeDetails.length > 0 ? (
+                  <>
+                    {store.phone && (
+                      <span className="inline-flex items-center gap-1">
+                        <Phone className="size-3" />
+                        {store.phone}
+                      </span>
+                    )}
+                    {store.address && (
+                      <span className="inline-flex items-center gap-1 max-w-[200px]">
+                        <MapPin className="size-3 shrink-0" />
+                        <span className="truncate">{store.address}{store.postal_code ? `, ${store.postal_code}` : ""}</span>
+                      </span>
+                    )}
+                    {!store.address && store.postal_code && (
+                      <span>{store.postal_code}</span>
+                    )}
+                  </>
+                ) : undefined,
               );
             })}
 
