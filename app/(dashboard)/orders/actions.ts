@@ -218,7 +218,7 @@ export async function adminCreateOrder(
 
     const { data: product } = await adminClient
       .from("products")
-      .select("id, name")
+      .select("id, name, in_stock")
       .eq("id", modRow.product_id)
       .eq("active", true)
       .single();
@@ -226,6 +226,11 @@ export async function adminCreateOrder(
     if (!product) {
       await adminClient.from("orders").delete().eq("id", order.id);
       return { data: null, error: `Product "${item.product_name}" is no longer available.` };
+    }
+
+    if (!product.in_stock) {
+      await adminClient.from("orders").delete().eq("id", order.id);
+      return { data: null, error: `Product "${product.name}" is out of stock.` };
     }
 
     orderItems.push({
