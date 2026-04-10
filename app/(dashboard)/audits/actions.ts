@@ -164,30 +164,36 @@ export async function completeAudit(
     };
   }
 
-  // Fetch template rating options for weight lookup
-  const { data: templateConfig } = await auth.supabase
-    .from("audit_templates")
-    .select("rating_labels")
-    .eq("id", audit.template_id)
-    .single();
+  // Fetch per-item rating options for weight lookup
+  const [{ data: templateItems }, { data: allResponses }] = await Promise.all([
+    auth.supabase
+      .from("audit_template_items")
+      .select("id, rating_labels")
+      .eq("template_id", audit.template_id),
+    auth.supabase
+      .from("audit_responses")
+      .select("rating, template_item_id")
+      .eq("audit_id", audit.id),
+  ]);
 
-  const ratingOptions = (templateConfig?.rating_labels ?? []) as import("@/lib/types").RatingOption[];
-  const weightMap: Record<string, number> = {};
+  // Build item → weight map
+  const itemRatingsMap = new Map(
+    (templateItems ?? []).map((i) => [i.id, i.rating_labels as import("@/lib/types").RatingOption[]])
+  );
+
   let maxWeight = 1;
-  for (const opt of ratingOptions) {
-    weightMap[opt.key] = opt.weight;
-    if (opt.weight > maxWeight) maxWeight = opt.weight;
+  for (const ratings of itemRatingsMap.values()) {
+    for (const opt of ratings) {
+      if (opt.weight > maxWeight) maxWeight = opt.weight;
+    }
   }
 
-  const { data: allResponses } = await auth.supabase
-    .from("audit_responses")
-    .select("rating")
-    .eq("audit_id", audit.id);
-
-  const sumWeights = (allResponses ?? []).reduce(
-    (sum, r) => sum + (weightMap[r.rating] ?? 0),
-    0
-  );
+  const sumWeights = (allResponses ?? []).reduce((sum, r) => {
+    const ratings = itemRatingsMap.get(r.template_item_id);
+    const weightMap: Record<string, number> = {};
+    if (ratings) for (const opt of ratings) weightMap[opt.key] = opt.weight;
+    return sum + (weightMap[r.rating] ?? 0);
+  }, 0);
   const score =
     totalItems > 0 ? Math.round((sumWeights / (totalItems * maxWeight)) * 10000) / 100 : 0;
 
@@ -300,22 +306,28 @@ export async function updateAuditResponse(
     return { data: null, error: "Failed to update response. Please try again." };
   }
 
-  // Recalculate score using template rating weights
-  const [{ count: totalItems }, { data: tplConfig }, { data: allResponses }] = await Promise.all([
+  // Recalculate score using per-item rating weights
+  const [{ count: totalItems }, { data: tplItems }, { data: allResponses }] = await Promise.all([
     supabase.from("audit_template_items").select("id", { count: "exact", head: true }).eq("template_id", audit.template_id),
-    supabase.from("audit_templates").select("rating_labels").eq("id", audit.template_id).single(),
-    supabase.from("audit_responses").select("rating").eq("audit_id", audit.id),
+    supabase.from("audit_template_items").select("id, rating_labels").eq("template_id", audit.template_id),
+    supabase.from("audit_responses").select("rating, template_item_id").eq("audit_id", audit.id),
   ]);
 
-  const opts = (tplConfig?.rating_labels ?? []) as import("@/lib/types").RatingOption[];
-  const wm: Record<string, number> = {};
-  let mw = 1;
-  for (const o of opts) { wm[o.key] = o.weight; if (o.weight > mw) mw = o.weight; }
-
-  const sumWeights = (allResponses ?? []).reduce(
-    (sum, r) => sum + (wm[r.rating] ?? 0),
-    0
+  const itemRatingsMap = new Map(
+    (tplItems ?? []).map((i) => [i.id, i.rating_labels as import("@/lib/types").RatingOption[]])
   );
+
+  let mw = 1;
+  for (const ratings of itemRatingsMap.values()) {
+    for (const opt of ratings) { if (opt.weight > mw) mw = opt.weight; }
+  }
+
+  const sumWeights = (allResponses ?? []).reduce((sum, r) => {
+    const ratings = itemRatingsMap.get(r.template_item_id);
+    const wm: Record<string, number> = {};
+    if (ratings) for (const opt of ratings) wm[opt.key] = opt.weight;
+    return sum + (wm[r.rating] ?? 0);
+  }, 0);
   const total = totalItems ?? allResponses?.length ?? 1;
   const score = total > 0 ? Math.round((sumWeights / (total * mw)) * 10000) / 100 : 0;
 

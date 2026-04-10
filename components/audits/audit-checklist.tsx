@@ -25,7 +25,6 @@ interface AuditChecklistProps {
   items: AuditTemplateItemRow[];
   existingResponses: AuditResponseRow[];
   existingEvidence: AuditEvidenceRow[];
-  ratingOptions: RatingOption[];
 }
 
 interface ResponseState {
@@ -41,7 +40,6 @@ export function AuditChecklist({
   items,
   existingResponses,
   existingEvidence,
-  ratingOptions,
 }: AuditChecklistProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -84,8 +82,17 @@ export function AuditChecklist({
       .sort((a, b) => a.sort_order - b.sort_order);
   }
 
-  // Rating lookup
-  const ratingMap = new Map(ratingOptions.map((r) => [r.key, r]));
+  // Collect all unique rating options across items for progress display
+  const allRatingKeys = new Set<string>();
+  const allRatingOptions: RatingOption[] = [];
+  for (const item of items) {
+    for (const opt of item.rating_labels) {
+      if (!allRatingKeys.has(opt.key)) {
+        allRatingKeys.add(opt.key);
+        allRatingOptions.push(opt);
+      }
+    }
+  }
 
   const handleRating = useCallback(
     async (itemId: string, ratingKey: string) => {
@@ -170,7 +177,7 @@ export function AuditChecklist({
 
   // Count ratings by key
   const ratingCounts: Record<string, number> = {};
-  for (const opt of ratingOptions) ratingCounts[opt.key] = 0;
+  for (const opt of allRatingOptions) ratingCounts[opt.key] = 0;
   for (const r of Object.values(responses)) {
     ratingCounts[r.rating] = (ratingCounts[r.rating] ?? 0) + 1;
   }
@@ -192,7 +199,7 @@ export function AuditChecklist({
               {answeredCount} of {totalItems} rated
             </span>
             <span className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
-              {ratingOptions.map((opt) => (
+              {allRatingOptions.map((opt) => (
                 <span key={opt.key} className="flex items-center gap-1">
                   <span
                     className="size-2 sm:size-2.5 rounded-full"
@@ -245,6 +252,7 @@ export function AuditChecklist({
                   const response = responses[item.id];
                   const responseId = response?.id;
                   const evidence = responseId ? (evidenceMap[responseId] ?? []) : [];
+                  const itemRatingOptions = item.rating_labels;
 
                   return (
                     <div key={item.id} className="border rounded-lg p-3">
@@ -256,9 +264,9 @@ export function AuditChecklist({
                           )}
                         </div>
 
-                        {/* Dynamic rating selector */}
+                        {/* Per-item rating selector */}
                         <div className="flex gap-1 shrink-0 flex-wrap">
-                          {ratingOptions.map((opt) => {
+                          {itemRatingOptions.map((opt) => {
                             const isActive = response?.rating === opt.key;
                             return (
                               <button

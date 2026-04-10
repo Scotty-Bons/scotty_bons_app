@@ -23,7 +23,6 @@ import type {
   AuditEvidenceRow,
   RatingOption,
 } from "@/lib/types";
-import { DEFAULT_RATING_OPTIONS } from "@/lib/types";
 
 export default async function AuditDetailPage({
   params,
@@ -75,7 +74,7 @@ export default async function AuditDetailPage({
       .order("sort_order"),
     supabase
       .from("audit_template_items")
-      .select("id, template_id, category_id, label, description, sort_order, created_at")
+      .select("id, template_id, category_id, label, description, sort_order, rating_labels, created_at")
       .eq("template_id", audit.template_id)
       .order("sort_order"),
     supabase
@@ -89,11 +88,23 @@ export default async function AuditDetailPage({
     conductorResult.data?.user?.email ??
     "—";
 
-  const ratingOptions = (template?.rating_labels as RatingOption[]) ?? DEFAULT_RATING_OPTIONS;
-  const ratingMap = new Map(ratingOptions.map((r) => [r.key, r]));
-
   const categories = (templateCategories ?? []) as AuditTemplateCategoryRow[];
   const items = (templateItems ?? []) as AuditTemplateItemRow[];
+
+  // Build per-item rating maps
+  const itemRatingMap = new Map<string, Map<string, RatingOption>>();
+  const allRatingKeys = new Set<string>();
+  const allRatingOptions: RatingOption[] = [];
+  for (const item of items) {
+    const map = new Map(item.rating_labels.map((r) => [r.key, r]));
+    itemRatingMap.set(item.id, map);
+    for (const opt of item.rating_labels) {
+      if (!allRatingKeys.has(opt.key)) {
+        allRatingKeys.add(opt.key);
+        allRatingOptions.push(opt);
+      }
+    }
+  }
   const responseList = (responses ?? []) as AuditResponseRow[];
   const responseMap: Record<string, AuditResponseRow> = {};
   for (const r of responseList) {
@@ -133,7 +144,7 @@ export default async function AuditDetailPage({
 
   // Rating summary
   const ratingCounts: Record<string, number> = {};
-  for (const opt of ratingOptions) ratingCounts[opt.key] = 0;
+  for (const opt of allRatingOptions) ratingCounts[opt.key] = 0;
   for (const r of responseList) {
     ratingCounts[r.rating] = (ratingCounts[r.rating] ?? 0) + 1;
   }
@@ -190,7 +201,7 @@ export default async function AuditDetailPage({
               storeName={store?.name ?? "Unknown Store"}
               templateName={template?.name ?? "Audit"}
               conductorName={conductorName}
-              ratingOptions={ratingOptions}
+              ratingOptions={allRatingOptions}
             />
           )}
           {canConduct && !isCompleted && (
@@ -249,7 +260,7 @@ export default async function AuditDetailPage({
               <div className="text-right">
                 <p className="text-lg font-semibold">{getScoreLabel(audit.score)}</p>
                 <p className="text-sm text-muted-foreground">
-                  {ratingOptions.map((opt, i) => (
+                  {allRatingOptions.map((opt, i) => (
                     <span key={opt.key}>{i > 0 && " · "}{ratingCounts[opt.key] ?? 0} {opt.label.toLowerCase()}</span>
                   ))}
                 </p>
@@ -291,18 +302,32 @@ export default async function AuditDetailPage({
                   {(() => {
                     const ratedItems = catItems.filter((i) => responseMap[i.id]);
                     if (ratedItems.length === 0) return null;
-                    const maxWeight = Math.max(...ratingOptions.map((o) => o.weight), 1);
-                    const total = ratedItems.reduce(
-                      (sum, i) => sum + (ratingMap.get(responseMap[i.id].rating)?.weight ?? 0),
-                      0
-                    );
+                    let maxWeight = 1;
+                    let total = 0;
+                    for (const i of ratedItems) {
+                      const iRatingMap = itemRatingMap.get(i.id);
+                      const mw = Math.max(...(i.rating_labels.map((o) => o.weight)), 1);
+                      if (mw > maxWeight) maxWeight = mw;
+                      total += iRatingMap?.get(responseMap[i.id].rating)?.weight ?? 0;
+                    }
                     const pct = Math.round((total / (ratedItems.length * maxWeight)) * 100);
                     const counts: Record<string, number> = {};
                     for (const i of ratedItems) counts[responseMap[i.id].rating] = (counts[responseMap[i.id].rating] ?? 0) + 1;
+                    // Collect unique rating options across items in this category
+                    const catRatingKeys = new Set<string>();
+                    const catRatingOptions: RatingOption[] = [];
+                    for (const i of catItems) {
+                      for (const opt of i.rating_labels) {
+                        if (!catRatingKeys.has(opt.key)) {
+                          catRatingKeys.add(opt.key);
+                          catRatingOptions.push(opt);
+                        }
+                      }
+                    }
                     return (
                       <div className="flex items-center gap-3 text-xs">
                         <span className="text-muted-foreground">
-                          {ratingOptions.map((opt, idx) => (
+                          {catRatingOptions.map((opt, idx) => (
                             <span key={opt.key}>{idx > 0 && " · "}{counts[opt.key] ?? 0} {opt.label.toLowerCase()}</span>
                           ))}
                         </span>
@@ -319,6 +344,7 @@ export default async function AuditDetailPage({
                   {catItems.map((item) => {
                     const response = responseMap[item.id];
                     const evidence = response ? (evidenceMap[response.id] ?? []) : [];
+                    const iRatingMap = itemRatingMap.get(item.id) ?? new Map();
                     return (
                       <div key={item.id} className="border rounded-lg p-3">
                         <div className="flex items-start gap-3">
@@ -330,16 +356,16 @@ export default async function AuditDetailPage({
                                   auditId={audit.id}
                                   currentRating={response.rating}
                                   currentNotes={response.notes}
-                                  ratingOptions={ratingOptions}
+                                  ratingOptions={item.rating_labels}
                                 />
                               </div>
                             ) : (
                               <Badge
                                 variant="status"
-                                style={getRatingStyle(ratingMap.get(response.rating)?.weight ?? 0)}
+                                style={getRatingStyle(iRatingMap.get(response.rating)?.weight ?? 0)}
                                 className="shrink-0 mt-0.5 text-xs"
                               >
-                                {ratingMap.get(response.rating)?.label ?? response.rating}
+                                {iRatingMap.get(response.rating)?.label ?? response.rating}
                               </Badge>
                             )
                           ) : (

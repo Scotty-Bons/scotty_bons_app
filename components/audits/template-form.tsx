@@ -47,8 +47,7 @@ export function TemplateForm({ defaultValues, onSubmit, onCancel }: TemplateForm
     defaultValues: defaultValues ?? {
       name: "",
       description: "",
-      rating_options: DEFAULT_RATING_OPTIONS,
-      categories: [{ name: "", items: [{ label: "" }] }],
+      categories: [{ name: "", items: [{ label: "", rating_options: DEFAULT_RATING_OPTIONS }] }],
     },
   });
 
@@ -59,20 +58,11 @@ export function TemplateForm({ defaultValues, onSubmit, onCancel }: TemplateForm
     swap: swapCategory,
   } = useFieldArray({ control, name: "categories" });
 
-  const {
-    fields: ratingFields,
-    append: appendRating,
-    remove: removeRating,
-    swap: swapRating,
-  } = useFieldArray({ control, name: "rating_options" });
-
   const [collapsedCategories, setCollapsedCategories] = useState<Record<number, boolean>>({});
 
   function toggleCollapse(index: number) {
     setCollapsedCategories((prev) => ({ ...prev, [index]: !prev[index] }));
   }
-
-  const ratingOptionsWatch = watch("rating_options");
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -97,85 +87,6 @@ export function TemplateForm({ defaultValues, onSubmit, onCancel }: TemplateForm
         )}
       </div>
 
-      {/* Rating Options */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <Label>Rating Scale</Label>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Define the rating options and their weights (0 = worst, 1 = best).
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => appendRating({ key: `rating-${Date.now()}`, label: "", weight: 0 })}
-          >
-            <Plus className="size-4 mr-1" />
-            Add Rating
-          </Button>
-        </div>
-
-        {errors.rating_options?.root && (
-          <p className="text-sm text-red-600">{errors.rating_options.root.message}</p>
-        )}
-        {errors.rating_options?.message && (
-          <p className="text-sm text-red-600">{errors.rating_options.message}</p>
-        )}
-
-        <div className="space-y-2">
-          {ratingFields.map((field, index) => {
-            const weight = ratingOptionsWatch?.[index]?.weight ?? 0;
-            const style = getRatingStyle(weight);
-            return (
-              <div key={field.id} className="flex items-center gap-2">
-                <div
-                  className="w-2 h-8 rounded-full shrink-0"
-                  style={{ backgroundColor: style.backgroundColor as string }}
-                />
-                <Input
-                  {...register(`rating_options.${index}.label`)}
-                  placeholder="Label (e.g. Good)"
-                  className="flex-1"
-                  onBlur={(e) => {
-                    // Auto-generate key from label if key matches default pattern
-                    const currentKey = ratingOptionsWatch?.[index]?.key ?? "";
-                    if (!currentKey || currentKey.startsWith("rating-")) {
-                      setValue(`rating_options.${index}.key`, slugify(e.target.value));
-                    }
-                  }}
-                />
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="1"
-                  {...register(`rating_options.${index}.weight`, { valueAsNumber: true })}
-                  placeholder="Weight"
-                  className="w-20"
-                />
-                <input type="hidden" {...register(`rating_options.${index}.key`)} />
-                <div className="flex items-center gap-0.5 shrink-0">
-                  <Button type="button" variant="ghost" size="icon" className="size-7" disabled={index === 0} onClick={() => swapRating(index, index - 1)}>
-                    <ArrowUp className="size-3" />
-                  </Button>
-                  <Button type="button" variant="ghost" size="icon" className="size-7" disabled={index === ratingFields.length - 1} onClick={() => swapRating(index, index + 1)}>
-                    <ArrowDown className="size-3" />
-                  </Button>
-                  <Button type="button" variant="ghost" size="icon" className="size-7" disabled={ratingFields.length <= 2} onClick={() => removeRating(index)}>
-                    <Trash2 className="size-3" />
-                  </Button>
-                </div>
-                {errors.rating_options?.[index]?.label && (
-                  <p className="text-xs text-red-600">{errors.rating_options[index].label.message}</p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <Label>Categories &amp; Items</Label>
@@ -183,7 +94,7 @@ export function TemplateForm({ defaultValues, onSubmit, onCancel }: TemplateForm
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => appendCategory({ name: "", items: [{ label: "" }] })}
+            onClick={() => appendCategory({ name: "", items: [{ label: "", rating_options: DEFAULT_RATING_OPTIONS }] })}
           >
             <Plus className="size-4 mr-1" />
             Add Category
@@ -206,6 +117,8 @@ export function TemplateForm({ defaultValues, onSubmit, onCancel }: TemplateForm
               control={control}
               register={register}
               errors={errors}
+              watch={watch}
+              setValue={setValue}
               collapsed={!!collapsedCategories[catIndex]}
               onToggleCollapse={() => toggleCollapse(catIndex)}
               onMoveUp={() => swapCategory(catIndex, catIndex - 1)}
@@ -234,6 +147,8 @@ function CategorySection({
   control,
   register,
   errors,
+  watch,
+  setValue,
   collapsed,
   onToggleCollapse,
   onMoveUp,
@@ -245,13 +160,15 @@ function CategorySection({
   control: any;
   register: any;
   errors: any;
+  watch: any;
+  setValue: any;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   onRemove: () => void;
 }) {
-  const { fields, append, remove, swap } = useFieldArray({
+  const { fields: itemFields, append: appendItem, remove: removeItem, swap: swapItem } = useFieldArray({
     control,
     name: `categories.${catIndex}.items`,
   });
@@ -299,7 +216,7 @@ function CategorySection({
 
       {/* Items — collapsible */}
       {!collapsed && (
-        <div className="pl-9 space-y-2">
+        <div className="pl-9 space-y-3">
           {catErrors?.items?.root && (
             <p className="text-xs text-red-600">{catErrors.items.root.message}</p>
           )}
@@ -308,57 +225,192 @@ function CategorySection({
           )}
 
           <div className="text-xs text-muted-foreground">
-            {fields.length} {fields.length === 1 ? "item" : "items"}
+            {itemFields.length} {itemFields.length === 1 ? "item" : "items"}
             {categoryName ? ` in "${categoryName}"` : ""}
           </div>
 
-          {fields.map((field, itemIndex) => (
-            <div key={field.id} className="flex items-start gap-2">
-              <span className="text-xs text-muted-foreground mt-2.5 w-6 text-right shrink-0">
-                {itemIndex + 1}.
-              </span>
-              <div className="flex-1 space-y-1">
-                <Input
-                  {...register(`categories.${catIndex}.items.${itemIndex}.label`)}
-                  placeholder="Checklist item label"
-                />
-                {catErrors?.items?.[itemIndex]?.label && (
-                  <p className="text-xs text-red-600">
-                    {catErrors.items[itemIndex].label.message}
-                  </p>
-                )}
-                <Textarea
-                  {...register(`categories.${catIndex}.items.${itemIndex}.description`)}
-                  placeholder="Detailed description (optional)"
-                  rows={1}
-                  className="text-xs resize-none"
-                />
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <Button type="button" variant="ghost" size="icon" className="size-7" disabled={itemIndex === 0} onClick={() => swap(itemIndex, itemIndex - 1)}>
-                  <ArrowUp className="size-3" />
-                </Button>
-                <Button type="button" variant="ghost" size="icon" className="size-7" disabled={itemIndex === fields.length - 1} onClick={() => swap(itemIndex, itemIndex + 1)}>
-                  <ArrowDown className="size-3" />
-                </Button>
-                <Button type="button" variant="ghost" size="icon" className="size-7" disabled={fields.length <= 1} onClick={() => remove(itemIndex)}>
-                  <Trash2 className="size-3" />
-                </Button>
-              </div>
-            </div>
+          {itemFields.map((field, itemIndex) => (
+            <ItemSection
+              key={field.id}
+              catIndex={catIndex}
+              itemIndex={itemIndex}
+              totalItems={itemFields.length}
+              control={control}
+              register={register}
+              errors={catErrors}
+              watch={watch}
+              setValue={setValue}
+              onMoveUp={() => swapItem(itemIndex, itemIndex - 1)}
+              onMoveDown={() => swapItem(itemIndex, itemIndex + 1)}
+              onRemove={() => removeItem(itemIndex)}
+            />
           ))}
 
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => append({ label: "" })}
+            onClick={() => appendItem({ label: "", rating_options: DEFAULT_RATING_OPTIONS })}
           >
             <Plus className="size-3.5 mr-1" />
             Add Item
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+function ItemSection({
+  catIndex,
+  itemIndex,
+  totalItems,
+  control,
+  register,
+  errors,
+  watch,
+  setValue,
+  onMoveUp,
+  onMoveDown,
+  onRemove,
+}: {
+  catIndex: number;
+  itemIndex: number;
+  totalItems: number;
+  control: any;
+  register: any;
+  errors: any;
+  watch: any;
+  setValue: any;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onRemove: () => void;
+}) {
+  const { fields: ratingFields, append: appendRating, remove: removeRating, swap: swapRating } = useFieldArray({
+    control,
+    name: `categories.${catIndex}.items.${itemIndex}.rating_options`,
+  });
+
+  const ratingOptionsWatch = watch(`categories.${catIndex}.items.${itemIndex}.rating_options`);
+  const itemErrors = errors?.items?.[itemIndex];
+  const [ratingsExpanded, setRatingsExpanded] = useState(false);
+
+  return (
+    <div className="border rounded-md p-3 space-y-2 bg-background">
+      <div className="flex items-start gap-2">
+        <span className="text-xs text-muted-foreground mt-2.5 w-6 text-right shrink-0">
+          {itemIndex + 1}.
+        </span>
+        <div className="flex-1 space-y-1">
+          <Input
+            {...register(`categories.${catIndex}.items.${itemIndex}.label`)}
+            placeholder="Checklist item label"
+          />
+          {itemErrors?.label && (
+            <p className="text-xs text-red-600">{itemErrors.label.message}</p>
+          )}
+          <Textarea
+            {...register(`categories.${catIndex}.items.${itemIndex}.description`)}
+            placeholder="Detailed description (optional)"
+            rows={1}
+            className="text-xs resize-none"
+          />
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button type="button" variant="ghost" size="icon" className="size-7" disabled={itemIndex === 0} onClick={onMoveUp}>
+            <ArrowUp className="size-3" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="size-7" disabled={itemIndex === totalItems - 1} onClick={onMoveDown}>
+            <ArrowDown className="size-3" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="size-7" disabled={totalItems <= 1} onClick={onRemove}>
+            <Trash2 className="size-3" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Per-item rating scale */}
+      <div className="ml-8 space-y-2">
+        <button
+          type="button"
+          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          onClick={() => setRatingsExpanded(!ratingsExpanded)}
+        >
+          {ratingsExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+          Rating Scale ({ratingFields.length} options)
+        </button>
+
+        {itemErrors?.rating_options?.root && (
+          <p className="text-xs text-red-600">{itemErrors.rating_options.root.message}</p>
+        )}
+        {itemErrors?.rating_options?.message && (
+          <p className="text-xs text-red-600">{itemErrors.rating_options.message}</p>
+        )}
+
+        {ratingsExpanded && (
+          <div className="space-y-2 pl-4 border-l-2 border-muted">
+            <p className="text-xs text-muted-foreground">
+              Define the rating options and their weights (0 = worst, 1 = best).
+            </p>
+            {ratingFields.map((field, index) => {
+              const weight = ratingOptionsWatch?.[index]?.weight ?? 0;
+              const style = getRatingStyle(weight);
+              return (
+                <div key={field.id} className="flex items-center gap-2">
+                  <div
+                    className="w-2 h-8 rounded-full shrink-0"
+                    style={{ backgroundColor: style.backgroundColor as string }}
+                  />
+                  <Input
+                    {...register(`categories.${catIndex}.items.${itemIndex}.rating_options.${index}.label`)}
+                    placeholder="Label (e.g. Good)"
+                    className="flex-1"
+                    onBlur={(e) => {
+                      const currentKey = ratingOptionsWatch?.[index]?.key ?? "";
+                      if (!currentKey || currentKey.startsWith("rating-")) {
+                        setValue(`categories.${catIndex}.items.${itemIndex}.rating_options.${index}.key`, slugify(e.target.value));
+                      }
+                    }}
+                  />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="1"
+                    {...register(`categories.${catIndex}.items.${itemIndex}.rating_options.${index}.weight`, { valueAsNumber: true })}
+                    placeholder="Weight"
+                    className="w-20"
+                  />
+                  <input type="hidden" {...register(`categories.${catIndex}.items.${itemIndex}.rating_options.${index}.key`)} />
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <Button type="button" variant="ghost" size="icon" className="size-7" disabled={index === 0} onClick={() => swapRating(index, index - 1)}>
+                      <ArrowUp className="size-3" />
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon" className="size-7" disabled={index === ratingFields.length - 1} onClick={() => swapRating(index, index + 1)}>
+                      <ArrowDown className="size-3" />
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon" className="size-7" disabled={ratingFields.length <= 2} onClick={() => removeRating(index)}>
+                      <Trash2 className="size-3" />
+                    </Button>
+                  </div>
+                  {itemErrors?.rating_options?.[index]?.label && (
+                    <p className="text-xs text-red-600">{itemErrors.rating_options[index].label.message}</p>
+                  )}
+                </div>
+              );
+            })}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => appendRating({ key: `rating-${Date.now()}`, label: "", weight: 0 })}
+            >
+              <Plus className="size-3.5 mr-1" />
+              Add Rating
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

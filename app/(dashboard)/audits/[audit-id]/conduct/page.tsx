@@ -8,9 +8,7 @@ import type {
   AuditTemplateItemRow,
   AuditResponseRow,
   AuditEvidenceRow,
-  RatingOption,
 } from "@/lib/types";
-import { DEFAULT_RATING_OPTIONS } from "@/lib/types";
 import { AuditChecklist } from "@/components/audits/audit-checklist";
 
 export default async function ConductAuditPage({
@@ -55,7 +53,7 @@ export default async function ConductAuditPage({
       .order("sort_order"),
     supabase
       .from("audit_template_items")
-      .select("id, template_id, category_id, label, description, sort_order, created_at")
+      .select("id, template_id, category_id, label, description, sort_order, rating_labels, created_at")
       .eq("template_id", audit.template_id)
       .order("sort_order"),
     supabase
@@ -111,7 +109,6 @@ export default async function ConductAuditPage({
         items={items}
         existingResponses={responseList}
         existingEvidence={evidenceList}
-        ratingOptions={(template?.rating_labels as RatingOption[]) ?? DEFAULT_RATING_OPTIONS}
       />
     </div>
   );
