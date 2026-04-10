@@ -9,11 +9,11 @@ export interface NavItem {
 }
 
 export const allNavItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin"] },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "commissary"] },
   { href: "/orders", label: "Orders", icon: Package, roles: ["admin", "commissary", "store"] },
   { href: "/invoices", label: "Invoices", icon: FileText, roles: ["admin", "commissary", "store"] },
   { href: "/audits", label: "Audits", icon: ClipboardCheck, roles: ["admin", "commissary", "store"] },
-  { href: "/products", label: "Products", icon: ShoppingBasket, roles: ["admin", "store"] },
+  { href: "/products", label: "Products", icon: ShoppingBasket, roles: ["admin", "commissary", "store"] },
   { href: "/users", label: "Users & Stores", icon: Users, roles: ["admin"] },
   { href: "/settings", label: "Settings", icon: Settings, roles: ["admin"] },
 ];

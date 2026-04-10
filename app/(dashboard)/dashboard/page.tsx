@@ -160,7 +160,7 @@ export default async function DashboardPage({
   if (!user) redirect("/login");
 
   const profile = await timer.time("profiles.select(cached)", () => getProfile());
-  if (!profile || profile.role !== "admin") redirect("/orders");
+  if (!profile || !["admin", "commissary"].includes(profile.role)) redirect("/orders");
 
   const supabase = await createClient();
 
