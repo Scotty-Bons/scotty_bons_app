@@ -144,6 +144,11 @@ export function EditOrderCart({ orderId, categories, products, currentItems }: E
   );
 
   const cartItems = useMemo(() => Array.from(cart.items.values()), [cart.items]);
+  const productByIdMap = useMemo(() => {
+    const map = new Map<string, ProductRow>();
+    for (const p of products) map.set(p.id, p);
+    return map;
+  }, [products]);
   const cartTotal = cartItems.reduce(
     (sum, item) => sum + item.unit_price * item.quantity,
     0
@@ -195,16 +200,39 @@ export function EditOrderCart({ orderId, categories, products, currentItems }: E
             </p>
           ) : (
             <div className="rounded-md border divide-y">
-              {cartItems.map((item) => (
+              {cartItems.map((item) => {
+                const itemProduct = productByIdMap.get(item.product_id);
+                return (
                 <div
                   key={item.modifier_id}
                   className="flex items-center justify-between gap-3 px-4 py-3"
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{item.product_name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatPrice(item.unit_price)} · {item.modifier_label}
-                    </p>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {itemProduct?.images?.[0] ? (
+                      <button
+                        type="button"
+                        onClick={() => setLightbox({ images: itemProduct.images, name: itemProduct.name, index: 0 })}
+                        className="shrink-0 relative"
+                      >
+                        <Image
+                          src={itemProduct.images[0].url}
+                          alt={item.product_name}
+                          width={48}
+                          height={48}
+                          className="size-12 rounded-md object-cover"
+                        />
+                      </button>
+                    ) : (
+                      <div className="flex size-12 shrink-0 items-center justify-center rounded-md bg-muted">
+                        <Package className="size-5 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{item.product_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatPrice(item.unit_price)} · {item.modifier_label}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1">
@@ -265,7 +293,8 @@ export function EditOrderCart({ orderId, categories, products, currentItems }: E
                     </Button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
               <div className="flex justify-between items-center px-4 py-3 bg-muted/50">
                 <span className="font-semibold">Total</span>
                 <span className="font-semibold">{formatPrice(cartTotal)}</span>
