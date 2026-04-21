@@ -57,25 +57,26 @@ export function InvoiceListWithSelection({ invoices }: InvoiceListWithSelectionP
   const invoiceIds = sorted.map((i) => i.id);
   const dateFmt = new Intl.DateTimeFormat("en-CA", { dateStyle: "medium" });
 
+  const sortSelect = (
+    <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+      <SelectTrigger className="w-[180px] h-9 rounded-xl text-xs">
+        <SelectValue placeholder="Sort by" />
+      </SelectTrigger>
+      <SelectContent className="rounded-xl">
+        <SelectItem value="newest">Newest first</SelectItem>
+        <SelectItem value="oldest">Oldest first</SelectItem>
+        <SelectItem value="store_asc">Store A → Z</SelectItem>
+        <SelectItem value="store_desc">Store Z → A</SelectItem>
+        <SelectItem value="invoice_asc">Invoice # ↑</SelectItem>
+        <SelectItem value="invoice_desc">Invoice # ↓</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+
   return (
-    <InvoiceSelectableList invoiceIds={invoiceIds}>
+    <InvoiceSelectableList invoiceIds={invoiceIds} headerActions={sortSelect}>
       {({ isSelected, toggleSelection }) => (
         <div className="space-y-3">
-          <div className="flex items-center justify-end">
-            <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
-              <SelectTrigger className="w-[180px] h-9 rounded-xl text-xs">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl">
-                <SelectItem value="newest">Newest first</SelectItem>
-                <SelectItem value="oldest">Oldest first</SelectItem>
-                <SelectItem value="store_asc">Store A → Z</SelectItem>
-                <SelectItem value="store_desc">Store Z → A</SelectItem>
-                <SelectItem value="invoice_asc">Invoice # ↑</SelectItem>
-                <SelectItem value="invoice_desc">Invoice # ↓</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           {sorted.map((invoice) => (
             <Card
               key={invoice.id}

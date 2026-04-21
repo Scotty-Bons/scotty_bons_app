@@ -132,14 +132,13 @@ export default async function OrdersPage({
     }
   }
 
-  // Apply text search post-filter
+  // Apply text search post-filter (order ID / order number only; store is filtered via the Store dropdown)
   if (textFilter) {
     const q = textFilter.toLowerCase();
     orders = orders.filter(
       (o) =>
         o.id.toLowerCase().startsWith(q) ||
-        (o.order_number ?? "").toLowerCase().includes(q) ||
-        (storeNames[o.store_id] ?? "").toLowerCase().includes(q),
+        (o.order_number ?? "").toLowerCase().includes(q),
     );
   }
 

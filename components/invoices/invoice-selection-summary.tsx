@@ -11,6 +11,7 @@ import type { InvoiceItemRow } from "@/lib/types";
 
 interface InvoiceSelectableListProps {
   invoiceIds: string[];
+  headerActions?: React.ReactNode;
   children: (props: {
     isSelected: (id: string) => boolean;
     toggleSelection: (id: string) => void;
@@ -31,6 +32,7 @@ interface AggregatedItem {
 
 export function InvoiceSelectableList({
   invoiceIds,
+  headerActions,
   children,
 }: InvoiceSelectableListProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -122,35 +124,40 @@ export function InvoiceSelectableList({
 
   return (
     <div className="space-y-4">
-      {invoiceIds.length > 1 && (
-        <div className="flex items-center gap-3 text-sm">
-          <Checkbox
-            checked={selected.size === invoiceIds.length && invoiceIds.length > 0}
-            onCheckedChange={(checked) => {
-              if (checked) selectAll();
-              else clearAll();
-            }}
-          />
-          <span className="text-muted-foreground">
-            {selected.size > 0
-              ? `${selected.size} selected`
-              : "Select invoices to compare"}
-          </span>
-          {selected.size >= 2 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchSummary}
-              disabled={isPending}
-            >
-              {isPending ? "Loading..." : "Show Summary"}
-            </Button>
+      {(invoiceIds.length > 1 || headerActions) && (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          {invoiceIds.length > 1 && (
+            <>
+              <Checkbox
+                checked={selected.size === invoiceIds.length && invoiceIds.length > 0}
+                onCheckedChange={(checked) => {
+                  if (checked) selectAll();
+                  else clearAll();
+                }}
+              />
+              <span className="text-muted-foreground">
+                {selected.size > 0
+                  ? `${selected.size} selected`
+                  : "Select invoices to compare"}
+              </span>
+              {selected.size >= 2 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchSummary}
+                  disabled={isPending}
+                >
+                  {isPending ? "Loading..." : "Show Summary"}
+                </Button>
+              )}
+              {selected.size > 0 && (
+                <Button variant="ghost" size="sm" onClick={clearAll}>
+                  Clear
+                </Button>
+              )}
+            </>
           )}
-          {selected.size > 0 && (
-            <Button variant="ghost" size="sm" onClick={clearAll}>
-              Clear
-            </Button>
-          )}
+          {headerActions && <div className="ml-auto">{headerActions}</div>}
         </div>
       )}
 

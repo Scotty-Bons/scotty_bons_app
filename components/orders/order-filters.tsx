@@ -81,114 +81,111 @@ export function OrderFilters({ role, stores }: OrderFiltersProps) {
   }
 
   const dateInputClass =
-    "flex h-9 w-full rounded-xl border border-input bg-muted/50 px-2 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary";
+    "flex h-10 w-full rounded-xl border border-input bg-muted/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary";
 
   return (
     <div
-      className={`space-y-2 ${isPending ? "opacity-60" : ""}`}
+      className={`flex flex-wrap items-end gap-3 ${isPending ? "opacity-60" : ""}`}
     >
-      {/* Row 1: Status + From + To (3 columns on mobile, flex-wrap on desktop) */}
-      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:gap-3">
-        <div className="sm:min-w-[120px]">
+      <div className="w-[calc(50%-6px)] sm:w-auto sm:min-w-[120px]">
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">
+          Status
+        </label>
+        <Select
+          value={currentStatus || "all"}
+          onValueChange={(v) => updateParams({ status: v === "all" ? "" : v })}
+        >
+          <SelectTrigger className="rounded-xl h-10">
+            <SelectValue placeholder="All" />
+          </SelectTrigger>
+          <SelectContent className="rounded-xl">
+            <SelectItem value="all">All</SelectItem>
+            {ALL_STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {STATUS_LABELS[s]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="w-[calc(50%-6px)] sm:w-auto sm:min-w-[140px]">
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">
+          From
+        </label>
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          onBlur={() => { if (fromDate !== currentFrom) updateParams({ from: fromDate }); }}
+          className={dateInputClass}
+        />
+      </div>
+
+      <div className="w-[calc(50%-6px)] sm:w-auto sm:min-w-[140px]">
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">
+          To
+        </label>
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          onBlur={() => { if (toDate !== currentTo) updateParams({ to: toDate }); }}
+          className={dateInputClass}
+        />
+      </div>
+
+      {role !== "store" && stores.length > 0 && (
+        <div className="w-[calc(50%-6px)] sm:w-auto sm:min-w-[140px]">
           <label className="text-xs font-medium text-muted-foreground mb-1 block">
-            Status
+            Store
           </label>
           <Select
-            value={currentStatus || "all"}
-            onValueChange={(v) => updateParams({ status: v === "all" ? "" : v })}
+            value={currentStoreId || "all"}
+            onValueChange={(v) =>
+              updateParams({ store_id: v === "all" ? "" : v })
+            }
           >
-            <SelectTrigger className="rounded-xl h-9 sm:h-10">
-              <SelectValue placeholder="All" />
+            <SelectTrigger className="rounded-xl h-10">
+              <SelectValue placeholder="All stores" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
-              <SelectItem value="all">All</SelectItem>
-              {ALL_STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {STATUS_LABELS[s]}
+              <SelectItem value="all">All stores</SelectItem>
+              {stores.map((store) => (
+                <SelectItem key={store.id} value={store.id}>
+                  {store.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
+      )}
 
-        <div className="sm:min-w-[140px]">
-          <label className="text-xs font-medium text-muted-foreground mb-1 block">
-            From
-          </label>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            onBlur={() => { if (fromDate !== currentFrom) updateParams({ from: fromDate }); }}
-            className={`${dateInputClass} sm:h-10`}
-          />
-        </div>
-
-        <div className="sm:min-w-[140px]">
-          <label className="text-xs font-medium text-muted-foreground mb-1 block">
-            To
-          </label>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            onBlur={() => { if (toDate !== currentTo) updateParams({ to: toDate }); }}
-            className={`${dateInputClass} sm:h-10`}
-          />
-        </div>
-
-        {role !== "store" && stores.length > 0 && (
-          <div className="col-span-3 sm:col-span-1 sm:min-w-[140px]">
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">
-              Store
-            </label>
-            <Select
-              value={currentStoreId || "all"}
-              onValueChange={(v) =>
-                updateParams({ store_id: v === "all" ? "" : v })
-              }
-            >
-              <SelectTrigger className="rounded-xl h-9 sm:h-10">
-                <SelectValue placeholder="All stores" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl">
-                <SelectItem value="all">All stores</SelectItem>
-                {stores.map((store) => (
-                  <SelectItem key={store.id} value={store.id}>
-                    {store.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+      <div className="w-full sm:w-auto sm:flex-1 sm:min-w-[180px]">
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">
+          Search
+        </label>
+        <Input
+          className="h-10"
+          placeholder="Order ID..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          onKeyDown={handleSearchKeyDown}
+          onBlur={() => {
+            if (searchText.trim() !== currentQ) {
+              updateParams({ q: searchText.trim() });
+            }
+          }}
+          leftIcon={<Search className="size-4" />}
+        />
       </div>
 
-      {/* Row 2: Search + Clear */}
-      <div className="flex items-end gap-2">
-        <div className="flex-1">
-          <Input
-            className="h-9 sm:h-10"
-            placeholder="Order ID or store name..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            onBlur={() => {
-              if (searchText.trim() !== currentQ) {
-                updateParams({ q: searchText.trim() });
-              }
-            }}
-            leftIcon={<Search className="size-4" />}
-          />
-        </div>
-
-        {hasFilters && (
-          <Button variant="outline" size="sm" className="h-9 sm:h-10 shrink-0" onClick={clearAll}>
-            <X className="size-4 mr-1" />
-            Clear
-          </Button>
-        )}
-      </div>
+      {hasFilters && (
+        <Button variant="outline" size="sm" onClick={clearAll}>
+          <X className="size-4 mr-1" />
+          Clear
+        </Button>
+      )}
     </div>
   );
 }
