@@ -24,7 +24,6 @@ export interface OrderPdfBufferData {
   subtotal: number;
   tax_rate: number;
   tax_amount: number;
-  ad_royalties_fee: number | null;
   grand_total: number;
 }
 
@@ -130,7 +129,6 @@ export function generateOrderPdfBuffer(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let ty = (doc as any).lastAutoTable.finalY + 8;
   const taxRatePercent = (Number(order.tax_rate) * 100).toFixed(2);
-  const adFee = Number(order.ad_royalties_fee ?? 0);
 
   doc.setFontSize(10);
   doc.setTextColor(0);
@@ -139,9 +137,8 @@ export function generateOrderPdfBuffer(
   const totalsLines: [string, string][] = [
     ["Subtotal:", fmt(Number(order.subtotal))],
     [`HST (${taxRatePercent}%):`, fmt(Number(order.tax_amount))],
+    ["Grand Total:", fmt(Number(order.grand_total))],
   ];
-  if (adFee > 0) totalsLines.push(["Ad & Royalties Fee:", fmt(adFee)]);
-  totalsLines.push(["Grand Total:", fmt(Number(order.grand_total))]);
 
   totalsLines.forEach(([label, value], idx) => {
     const isLast = idx === totalsLines.length - 1;
@@ -178,7 +175,6 @@ interface InvoiceData {
   subtotal: number;
   tax_rate: number;
   tax_amount: number;
-  ad_royalties_fee: number | null;
   grand_total: number;
 }
 
@@ -284,7 +280,8 @@ export function generateInvoicePdfBuffer(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let ty = (doc as any).lastAutoTable.finalY + 8;
   const taxRatePercent = (Number(invoice.tax_rate) * 100).toFixed(2);
-  const adFee = Number(invoice.ad_royalties_fee ?? 0);
+  const grandTotal =
+    Math.round((Number(invoice.subtotal) + Number(invoice.tax_amount)) * 100) / 100;
 
   doc.setFontSize(10);
   doc.setTextColor(0);
@@ -293,9 +290,8 @@ export function generateInvoicePdfBuffer(
   const totalsLines: [string, string][] = [
     ["Subtotal:", fmt(Number(invoice.subtotal))],
     [`HST (${taxRatePercent}%):`, fmt(Number(invoice.tax_amount))],
+    ["Grand Total:", fmt(grandTotal)],
   ];
-  if (adFee > 0) totalsLines.push(["Ad & Royalties Fee:", fmt(adFee)]);
-  totalsLines.push(["Grand Total:", fmt(Number(invoice.grand_total))]);
 
   totalsLines.forEach(([label, value], idx) => {
     const isLast = idx === totalsLines.length - 1;

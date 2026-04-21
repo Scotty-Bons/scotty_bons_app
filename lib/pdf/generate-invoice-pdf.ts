@@ -17,7 +17,6 @@ interface InvoiceData {
   subtotal: number;
   tax_rate: number;
   tax_amount: number;
-  ad_royalties_fee: number | null;
   grand_total: number;
 }
 
@@ -129,7 +128,8 @@ export function generateInvoicePdf(
   ]);
 
   const taxRatePercent = (Number(invoice.tax_rate) * 100).toFixed(2);
-  const adFee = Number(invoice.ad_royalties_fee ?? 0);
+  const grandTotal =
+    Math.round((Number(invoice.subtotal) + Number(invoice.tax_amount)) * 100) / 100;
 
   autoTable(doc, {
     startY: y,
@@ -165,11 +165,8 @@ export function generateInvoicePdf(
   const totalsLines: [string, string][] = [
     ["Subtotal:", fmt(Number(invoice.subtotal))],
     [`HST (${taxRatePercent}%):`, fmt(Number(invoice.tax_amount))],
+    ["Grand Total:", fmt(grandTotal)],
   ];
-  if (adFee > 0) {
-    totalsLines.push(["Ad & Royalties Fee:", fmt(adFee)]);
-  }
-  totalsLines.push(["Grand Total:", fmt(Number(invoice.grand_total))]);
 
   totalsLines.forEach(([label, value], idx) => {
     const isLast = idx === totalsLines.length - 1;

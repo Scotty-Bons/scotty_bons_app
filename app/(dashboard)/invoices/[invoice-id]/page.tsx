@@ -23,7 +23,7 @@ export default async function InvoiceDetailPage({
   const { data: invoice } = await supabase
     .from("invoices")
     .select(
-      "id, order_id, invoice_number, store_name, store_business_name, store_address, store_postal_code, store_phone, store_email, company_name, company_address, company_tax_id, subtotal, tax_rate, tax_amount, ad_royalties_fee, grand_total, created_at",
+      "id, order_id, invoice_number, store_name, store_business_name, store_address, store_postal_code, store_phone, store_email, company_name, company_address, company_tax_id, subtotal, tax_rate, tax_amount, grand_total, created_at",
     )
     .eq("id", invoiceId)
     .single();
@@ -43,7 +43,8 @@ export default async function InvoiceDetailPage({
   const dateFmt = new Intl.DateTimeFormat("en-CA", { dateStyle: "medium" });
 
   const taxRatePercent = Number(invoice.tax_rate) * 100;
-  const adFee = Number(invoice.ad_royalties_fee ?? 0);
+  const computedGrandTotal =
+    Math.round((Number(invoice.subtotal) + Number(invoice.tax_amount)) * 100) / 100;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -80,8 +81,7 @@ export default async function InvoiceDetailPage({
             subtotal: Number(invoice.subtotal),
             tax_rate: Number(invoice.tax_rate),
             tax_amount: Number(invoice.tax_amount),
-            ad_royalties_fee: invoice.ad_royalties_fee ? Number(invoice.ad_royalties_fee) : null,
-            grand_total: Number(invoice.grand_total),
+            grand_total: computedGrandTotal,
           }}
           items={invoiceItems.map((i) => ({
             product_name: i.product_name,
@@ -201,17 +201,9 @@ export default async function InvoiceDetailPage({
               </span>
               <span>{formatPrice(Number(invoice.tax_amount))}</span>
             </div>
-            {adFee > 0 && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  Ad & Royalties Fee
-                </span>
-                <span>{formatPrice(adFee)}</span>
-              </div>
-            )}
             <div className="flex justify-between border-t pt-2 text-base font-bold">
               <span>Grand Total</span>
-              <span>{formatPrice(Number(invoice.grand_total))}</span>
+              <span>{formatPrice(computedGrandTotal)}</span>
             </div>
           </div>
 

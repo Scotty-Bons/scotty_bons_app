@@ -21,7 +21,6 @@ interface ExportInvoicePdfButtonProps {
     subtotal: number;
     tax_rate: number;
     tax_amount: number;
-    ad_royalties_fee: number | null;
     grand_total: number;
   };
   items: {

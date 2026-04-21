@@ -19,7 +19,6 @@ export interface OrderPdfData {
   subtotal: number;
   tax_rate: number;
   tax_amount: number;
-  ad_royalties_fee: number | null;
   grand_total: number;
 }
 
@@ -165,7 +164,6 @@ export function generateOrderPdf(
   ]);
 
   const taxRatePercent = (Number(order.tax_rate) * 100).toFixed(2);
-  const adFee = Number(order.ad_royalties_fee ?? 0);
 
   autoTable(doc, {
     startY: y,
@@ -201,11 +199,8 @@ export function generateOrderPdf(
   const totalsLines: [string, string][] = [
     ["Subtotal:", fmt(Number(order.subtotal))],
     [`HST (${taxRatePercent}%):`, fmt(Number(order.tax_amount))],
+    ["Grand Total:", fmt(Number(order.grand_total))],
   ];
-  if (adFee > 0) {
-    totalsLines.push(["Ad & Royalties Fee:", fmt(adFee)]);
-  }
-  totalsLines.push(["Grand Total:", fmt(Number(order.grand_total))]);
 
   totalsLines.forEach(([label, value], idx) => {
     const isLast = idx === totalsLines.length - 1;

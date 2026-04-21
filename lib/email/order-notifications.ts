@@ -39,7 +39,7 @@ async function buildOrderPdfData(
 
     const [{ data: financialSettings }, { data: storeBilling }] = await Promise.all([
       supabase.from("financial_settings").select("key, value")
-        .in("key", ["hst_rate", "ad_royalties_fee", "commissary_name", "commissary_address", "commissary_postal_code", "commissary_phone"]),
+        .in("key", ["hst_rate", "commissary_name", "commissary_address", "commissary_postal_code", "commissary_phone"]),
       supabase.from("stores").select("business_name, address, postal_code, phone, email").eq("id", storeId).single(),
     ]);
 
@@ -47,10 +47,9 @@ async function buildOrderPdfData(
     for (const row of financialSettings ?? []) fsMap[row.key] = row.value;
 
     const hstRate = Number(fsMap.hst_rate ?? "13") / 100;
-    const adRoyaltiesFee = Number(fsMap.ad_royalties_fee ?? "0");
     const subtotal = orderItems.reduce((sum, i) => sum + Number(i.unit_price) * i.quantity, 0);
     const taxAmount = subtotal * hstRate;
-    const grandTotal = subtotal + taxAmount + adRoyaltiesFee;
+    const grandTotal = subtotal + taxAmount;
 
     const companyAddress = [fsMap.commissary_address, fsMap.commissary_postal_code].filter(Boolean).join("\n") || null;
 
@@ -69,7 +68,6 @@ async function buildOrderPdfData(
       subtotal,
       tax_rate: hstRate,
       tax_amount: taxAmount,
-      ad_royalties_fee: adRoyaltiesFee,
       grand_total: grandTotal,
     };
 

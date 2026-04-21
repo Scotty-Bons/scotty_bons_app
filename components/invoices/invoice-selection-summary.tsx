@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/utils";
 import { getInvoiceItemsForInvoices, getInvoiceTotalsForInvoices } from "@/app/(dashboard)/invoices/actions";
+import { getFinancialSettings } from "@/lib/settings/actions";
 import type { InvoiceItemRow } from "@/lib/types";
 
 interface InvoiceSelectableListProps {
@@ -72,9 +73,10 @@ export function InvoiceSelectableList({
     if (ids.length < 2) return;
 
     startTransition(async () => {
-      const [itemsResult, totalsResult] = await Promise.all([
+      const [itemsResult, totalsResult, settingsResult] = await Promise.all([
         getInvoiceItemsForInvoices(ids),
         getInvoiceTotalsForInvoices(ids),
+        getFinancialSettings(),
       ]);
       if (itemsResult.error || !itemsResult.data) return;
 
@@ -102,12 +104,18 @@ export function InvoiceSelectableList({
 
       setAggregated(Array.from(map.values()).sort((a, b) => a.product_name.localeCompare(b.product_name)));
 
-      if (totalsResult.data) {
+      if (totalsResult.data && settingsResult.data) {
+        const flatFee = settingsResult.data.ad_royalties_fee ?? 0;
+        const currentHstRate = settingsResult.data.hst_rate;
         setSubtotal(totalsResult.data.subtotal);
-        setHstRate(totalsResult.data.tax_rate);
+        setHstRate(currentHstRate);
         setHstAmount(totalsResult.data.tax_amount);
-        setAdFee(totalsResult.data.ad_royalties_fee);
-        setGrandTotal(totalsResult.data.grand_total);
+        setAdFee(flatFee);
+        setGrandTotal(
+          Math.round(
+            (totalsResult.data.subtotal + totalsResult.data.tax_amount + flatFee) * 100,
+          ) / 100,
+        );
       }
     });
   };

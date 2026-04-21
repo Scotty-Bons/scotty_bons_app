@@ -74,7 +74,7 @@ export default async function OrderDetailPage({
         supabase
           .from("financial_settings")
           .select("key, value")
-          .in("key", ["hst_rate", "ad_royalties_fee", "commissary_name", "commissary_address", "commissary_postal_code", "commissary_phone"]),
+          .in("key", ["hst_rate", "commissary_name", "commissary_address", "commissary_postal_code", "commissary_phone"]),
       ])
     );
 
@@ -122,7 +122,6 @@ export default async function OrderDetailPage({
   for (const row of financialSettings ?? []) fsMap[row.key] = row.value;
 
   const hstRate = Number(fsMap.hst_rate ?? "13") / 100;
-  const adRoyaltiesFee = Number(fsMap.ad_royalties_fee ?? "0");
 
   const companyName = fsMap.commissary_name ?? null;
   const companyAddress = [fsMap.commissary_address, fsMap.commissary_postal_code].filter(Boolean).join("\n") || null;
@@ -136,7 +135,7 @@ export default async function OrderDetailPage({
     0
   );
   const taxAmount = subtotal * hstRate;
-  const grandTotal = subtotal + taxAmount + adRoyaltiesFee;
+  const grandTotal = subtotal + taxAmount;
   const orderTotal = subtotal;
 
   const formatDate = (timestamp: string) =>
@@ -209,7 +208,6 @@ export default async function OrderDetailPage({
               subtotal,
               tax_rate: hstRate,
               tax_amount: taxAmount,
-              ad_royalties_fee: adRoyaltiesFee,
               grand_total: grandTotal,
             }}
             items={orderItems.map((i) => ({
@@ -360,19 +358,6 @@ export default async function OrderDetailPage({
                     {formatPrice(taxAmount)}
                   </td>
                 </tr>
-                {adRoyaltiesFee > 0 && (
-                  <tr>
-                    <td colSpan={3} className="py-1.5 text-right text-muted-foreground sm:hidden">
-                      Ad & Royalties Fee
-                    </td>
-                    <td colSpan={4} className="py-1.5 text-right text-muted-foreground hidden sm:table-cell">
-                      Ad & Royalties Fee
-                    </td>
-                    <td className="py-1.5 text-right">
-                      {formatPrice(adRoyaltiesFee)}
-                    </td>
-                  </tr>
-                )}
                 <tr className="border-t-2">
                   <td colSpan={3} className="py-2 text-right font-semibold sm:hidden">
                     Grand Total

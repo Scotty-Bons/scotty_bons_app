@@ -33,10 +33,7 @@ export async function getInvoiceTotalsForInvoices(
 ): Promise<
   ActionResult<{
     subtotal: number;
-    tax_rate: number;
     tax_amount: number;
-    ad_royalties_fee: number;
-    grand_total: number;
   }>
 > {
   if (!invoiceIds.length || invoiceIds.length > 50) {
@@ -51,7 +48,7 @@ export async function getInvoiceTotalsForInvoices(
 
   const { data, error } = await supabase
     .from("invoices")
-    .select("subtotal, tax_rate, tax_amount, ad_royalties_fee, grand_total")
+    .select("subtotal, tax_amount")
     .in("id", invoiceIds);
 
   if (error) {
@@ -61,12 +58,9 @@ export async function getInvoiceTotalsForInvoices(
   const totals = (data ?? []).reduce(
     (acc, inv) => ({
       subtotal: acc.subtotal + Number(inv.subtotal),
-      tax_rate: Number(inv.tax_rate), // same rate for all
       tax_amount: acc.tax_amount + Number(inv.tax_amount),
-      ad_royalties_fee: acc.ad_royalties_fee + Number(inv.ad_royalties_fee),
-      grand_total: acc.grand_total + Number(inv.grand_total),
     }),
-    { subtotal: 0, tax_rate: 0, tax_amount: 0, ad_royalties_fee: 0, grand_total: 0 },
+    { subtotal: 0, tax_amount: 0 },
   );
 
   return { data: totals, error: null };

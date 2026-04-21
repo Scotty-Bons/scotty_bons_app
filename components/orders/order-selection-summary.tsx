@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/utils";
-import { getOrderItemsForOrders, getFinancialSettings } from "@/app/(dashboard)/orders/actions";
+import { getOrderItemsForOrders } from "@/app/(dashboard)/orders/actions";
+import { getFinancialSettings } from "@/lib/settings/actions";
 import type { OrderItemRow } from "@/lib/types";
 
 interface OrderSelectableListProps {
@@ -103,7 +104,7 @@ export function OrderSelectableList({
       }
 
       const rate = settingsResult.data?.hst_rate ?? 0.13;
-      const fee = (settingsResult.data?.ad_royalties_fee ?? 0) * ids.length;
+      const fee = settingsResult.data?.ad_royalties_fee ?? 0;
       const tax = Math.round(itemsTotal * rate * 100) / 100;
       const grand = Math.round((itemsTotal + tax + fee) * 100) / 100;
 

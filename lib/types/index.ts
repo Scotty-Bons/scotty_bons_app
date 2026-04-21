@@ -95,7 +95,6 @@ export type InvoiceRow = {
   subtotal: number;
   tax_rate: number;
   tax_amount: number;
-  ad_royalties_fee: number;
   grand_total: number;
   created_at: string;
 };
