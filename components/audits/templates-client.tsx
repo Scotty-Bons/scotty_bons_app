@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, Copy } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import type { AuditTemplateRow } from "@/lib/types";
 import {
   toggleTemplateActive,
   deleteTemplate,
+  duplicateTemplate,
 } from "@/app/(dashboard)/audits/templates/actions";
 
 interface TemplatesClientProps {
@@ -33,6 +34,7 @@ export function TemplatesClient({ templates }: TemplatesClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [deletingTemplate, setDeletingTemplate] = useState<AuditTemplateRow | null>(null);
+  const [duplicatingTemplate, setDuplicatingTemplate] = useState<AuditTemplateRow | null>(null);
 
   function handleToggle(template: AuditTemplateRow, checked: boolean) {
     startTransition(async () => {
@@ -58,6 +60,21 @@ export function TemplatesClient({ templates }: TemplatesClientProps) {
       toast.success("Template deleted.");
       setDeletingTemplate(null);
       router.refresh();
+    });
+  }
+
+  function handleDuplicate() {
+    if (!duplicatingTemplate) return;
+    const source = duplicatingTemplate;
+    setDuplicatingTemplate(null);
+    startTransition(async () => {
+      const result = await duplicateTemplate(source.id);
+      if (result.error || !result.data) {
+        toast.error(result.error ?? "Failed to duplicate template.");
+        return;
+      }
+      toast.success(`"${source.name}" duplicated. Review and activate the copy.`);
+      router.push(`/audits/templates/${result.data.id}/edit`);
     });
   }
 
@@ -135,6 +152,7 @@ export function TemplatesClient({ templates }: TemplatesClientProps) {
                         variant="outline"
                         size="icon"
                         asChild
+                        aria-label="Edit template"
                       >
                         <Link href={`/audits/templates/${template.id}/edit`}>
                           <Pencil className="size-4" />
@@ -143,8 +161,18 @@ export function TemplatesClient({ templates }: TemplatesClientProps) {
                       <Button
                         variant="outline"
                         size="icon"
+                        onClick={() => setDuplicatingTemplate(template)}
+                        disabled={isPending}
+                        aria-label="Duplicate template"
+                      >
+                        <Copy className="size-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
                         onClick={() => setDeletingTemplate(template)}
                         disabled={isPending}
+                        aria-label="Delete template"
                       >
                         <Trash2 className="size-4" />
                       </Button>
@@ -173,6 +201,26 @@ export function TemplatesClient({ templates }: TemplatesClientProps) {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Duplicate Confirmation */}
+      <AlertDialog
+        open={!!duplicatingTemplate}
+        onOpenChange={(open) => !open && setDuplicatingTemplate(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Duplicate Template</AlertDialogTitle>
+            <AlertDialogDescription>
+              Create a copy of &quot;{duplicatingTemplate?.name}&quot; as a new inactive
+              template? You&apos;ll be taken to the editor to review and activate it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDuplicate}>Duplicate</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

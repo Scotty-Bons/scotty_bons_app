@@ -47,11 +47,13 @@ export default async function EditTemplatePage({ params }: Props) {
     name: template.name,
     description: template.description ?? undefined,
     categories: categories.map((cat) => ({
+      id: cat.id,
       name: cat.name,
       items: items
         .filter((i) => i.category_id === cat.id)
         .sort((a, b) => a.sort_order - b.sort_order)
         .map((i) => ({
+          id: i.id,
           label: i.label,
           description: i.description ?? undefined,
           rating_options: i.rating_labels,

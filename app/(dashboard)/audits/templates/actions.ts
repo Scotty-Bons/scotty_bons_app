@@ -121,69 +121,62 @@ export async function updateTemplate(
   const supabase = await verifyAdmin();
   if (!supabase) return { data: null, error: "Unauthorized." };
 
-  const { error } = await supabase
-    .from("audit_templates")
-    .update({
-      name: parsed.data.name,
-      description: parsed.data.description ?? null,
-    })
-    .eq("id", templateId)
-    .select("id")
-    .single();
+  const { error } = await supabase.rpc("update_audit_template", {
+    p_template_id: templateId,
+    p_name: parsed.data.name,
+    p_description: parsed.data.description ?? "",
+    p_categories: parsed.data.categories,
+  });
 
   if (error) {
-    if (error.code === "PGRST116") {
-      return { data: null, error: "Template not found." };
-    }
     if (error.code === "23505") {
       return { data: null, error: "A template with this name already exists." };
+    }
+    if (error.code === "P0002") {
+      return { data: null, error: error.message || "Template not found." };
+    }
+    if (error.code === "P0001") {
+      // User-facing error raised by the RPC (e.g., "Item X is used in submitted audits…")
+      return { data: null, error: error.message };
+    }
+    if (error.code === "42501") {
+      return { data: null, error: "Unauthorized." };
     }
     return { data: null, error: "Failed to update template. Please try again." };
   }
 
-  // Delete old categories (cascades to items)
-  await supabase
-    .from("audit_template_categories")
-    .delete()
-    .eq("template_id", templateId);
+  revalidatePath("/audits/templates");
+  return { data: null, error: null };
+}
 
-  // Insert new categories and items
-  for (let catIdx = 0; catIdx < parsed.data.categories.length; catIdx++) {
-    const cat = parsed.data.categories[catIdx];
-    const { data: category, error: catError } = await supabase
-      .from("audit_template_categories")
-      .insert({
-        template_id: templateId,
-        name: cat.name,
-        sort_order: catIdx,
-      })
-      .select("id")
-      .single();
+export async function duplicateTemplate(
+  templateId: string
+): Promise<ActionResult<{ id: string } | null>> {
+  const idParsed = idSchema.safeParse(templateId);
+  if (!idParsed.success) return { data: null, error: "Invalid template ID." };
 
-    if (catError || !category) {
-      return { data: null, error: "Failed to update template categories. Please try again." };
+  const supabase = await verifyAdmin();
+  if (!supabase) return { data: null, error: "Unauthorized." };
+
+  const { data, error } = await supabase.rpc("duplicate_audit_template", {
+    p_template_id: templateId,
+  });
+
+  if (error) {
+    if (error.code === "P0002") {
+      return { data: null, error: "Template not found." };
     }
-
-    const items = cat.items.map((item, itemIdx) => ({
-      template_id: templateId,
-      category_id: category.id,
-      label: item.label,
-      description: item.description ?? null,
-      sort_order: itemIdx,
-      rating_labels: item.rating_options,
-    }));
-
-    const { error: itemsError } = await supabase
-      .from("audit_template_items")
-      .insert(items);
-
-    if (itemsError) {
-      return { data: null, error: "Failed to update template items. Please try again." };
+    if (error.code === "P0001") {
+      return { data: null, error: error.message };
     }
+    if (error.code === "42501") {
+      return { data: null, error: "Unauthorized." };
+    }
+    return { data: null, error: "Failed to duplicate template. Please try again." };
   }
 
   revalidatePath("/audits/templates");
-  return { data: null, error: null };
+  return { data: { id: data as string }, error: null };
 }
 
 export async function toggleTemplateActive(

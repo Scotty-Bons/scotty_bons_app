@@ -7,6 +7,7 @@ const ratingOptionSchema = z.object({
 });
 
 const templateItemSchema = z.object({
+  id: z.string().uuid().optional(),
   label: z
     .string()
     .trim()
@@ -19,6 +20,7 @@ const templateItemSchema = z.object({
 });
 
 const templateCategorySchema = z.object({
+  id: z.string().uuid().optional(),
   name: z
     .string()
     .trim()

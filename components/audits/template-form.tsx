@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm, useFieldArray, useWatch } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -56,9 +56,15 @@ export function TemplateForm({ defaultValues, onSubmit, onCancel }: TemplateForm
     append: appendCategory,
     remove: removeCategory,
     swap: swapCategory,
-  } = useFieldArray({ control, name: "categories" });
+  } = useFieldArray({ control, name: "categories", keyName: "_rhfId" });
 
-  const [collapsedCategories, setCollapsedCategories] = useState<Record<number, boolean>>({});
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<number, boolean>>(() => {
+    const cats = defaultValues?.categories;
+    if (!cats || cats.length === 0) return {};
+    const init: Record<number, boolean> = {};
+    for (let i = 0; i < cats.length; i++) init[i] = true;
+    return init;
+  });
 
   function toggleCollapse(index: number) {
     setCollapsedCategories((prev) => ({ ...prev, [index]: !prev[index] }));
@@ -111,7 +117,7 @@ export function TemplateForm({ defaultValues, onSubmit, onCancel }: TemplateForm
         <div className="space-y-4">
           {categoryFields.map((catField, catIndex) => (
             <CategorySection
-              key={catField.id}
+              key={catField._rhfId}
               catIndex={catIndex}
               totalCategories={categoryFields.length}
               control={control}
@@ -171,9 +177,9 @@ function CategorySection({
   const { fields: itemFields, append: appendItem, remove: removeItem, swap: swapItem } = useFieldArray({
     control,
     name: `categories.${catIndex}.items`,
+    keyName: "_rhfId",
   });
 
-  const categoryName = useWatch({ control, name: `categories.${catIndex}.name` });
   const catErrors = errors.categories?.[catIndex];
 
   return (
@@ -201,6 +207,10 @@ function CategorySection({
           )}
         </div>
 
+        <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+          {itemFields.length} {itemFields.length === 1 ? "item" : "items"}
+        </span>
+
         <div className="flex items-center gap-1 shrink-0">
           <Button type="button" variant="ghost" size="icon" className="size-7" disabled={catIndex === 0} onClick={onMoveUp}>
             <ArrowUp className="size-3.5" />
@@ -224,14 +234,9 @@ function CategorySection({
             <p className="text-xs text-red-600">{catErrors.items.message}</p>
           )}
 
-          <div className="text-xs text-muted-foreground">
-            {itemFields.length} {itemFields.length === 1 ? "item" : "items"}
-            {categoryName ? ` in "${categoryName}"` : ""}
-          </div>
-
           {itemFields.map((field, itemIndex) => (
             <ItemSection
-              key={field.id}
+              key={field._rhfId}
               catIndex={catIndex}
               itemIndex={itemIndex}
               totalItems={itemFields.length}
@@ -377,7 +382,21 @@ function ItemSection({
                     step="0.01"
                     min="0"
                     max="1"
-                    {...register(`categories.${catIndex}.items.${itemIndex}.rating_options.${index}.weight`, { valueAsNumber: true })}
+                    {...register(`categories.${catIndex}.items.${itemIndex}.rating_options.${index}.weight`, {
+                      valueAsNumber: true,
+                      onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                        const raw = parseFloat(e.target.value);
+                        if (Number.isNaN(raw)) return;
+                        const clamped = Math.min(1, Math.max(0, raw));
+                        if (clamped !== raw) {
+                          setValue(
+                            `categories.${catIndex}.items.${itemIndex}.rating_options.${index}.weight`,
+                            clamped,
+                            { shouldValidate: true, shouldDirty: true }
+                          );
+                        }
+                      },
+                    })}
                     placeholder="Weight"
                     className="w-20"
                   />
