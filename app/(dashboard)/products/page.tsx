@@ -26,7 +26,7 @@ export default async function ProductsPage() {
         .order("sort_order"),
       supabase
         .from("products")
-        .select("id, name, category_id, sort_order, in_stock, product_modifiers(id, label, price, sort_order), product_images(id, url, sort_order)")
+        .select("id, name, category_id, sort_order, in_stock, stock_quantity, product_modifiers(id, label, price, sort_order), product_images(id, url, sort_order)")
         .eq("active", true)
         .order("sort_order"),
     ])
@@ -47,6 +47,7 @@ export default async function ProductsPage() {
       .sort((a, b) => a.sort_order - b.sort_order),
     sort_order: p.sort_order,
     in_stock: p.in_stock ?? true,
+    stock_quantity: p.stock_quantity ?? null,
     modifiers: ((p.product_modifiers ?? []) as ProductModifierRow[])
       .map((m) => ({
         id: m.id,
@@ -89,16 +90,17 @@ export default async function ProductsPage() {
           Failed to load some data. Please refresh the page.
         </div>
       )}
-      {isAdmin ? (
+      {isAdmin || isCommissary ? (
         <CatalogAdmin
           products={productsWithCategory}
           categories={categories}
+          userRole={isAdmin ? "admin" : "commissary"}
         />
       ) : (
         <CatalogBrowser
           categories={categories}
           products={productsWithCategory}
-          userRole={isCommissary ? "commissary" : "store"}
+          userRole="store"
         />
       )}
     </div>

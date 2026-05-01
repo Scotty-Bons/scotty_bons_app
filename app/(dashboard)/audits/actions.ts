@@ -251,7 +251,8 @@ export async function completeAudit(
         })),
     }));
 
-    await notifyAuditCompleted({
+    // Fire-and-forget: send email notification without blocking the response
+    void notifyAuditCompleted({
       auditId: audit.id,
       storeId: audit.store_id,
       storeName: storeData?.name ?? "Unknown Store",
@@ -261,9 +262,9 @@ export async function completeAudit(
       auditData: { score, conducted_at: new Date().toISOString(), notes: parsed.data.notes ?? null },
       categories: pdfCategories,
       ratingOptions: templateData?.rating_labels as import("@/lib/types").RatingOption[] | undefined,
-    });
+    }).catch((e) => console.error("[email] Failed to notify audit completed:", e));
   } catch (e) {
-    console.error("[email] Failed to notify audit completed:", e);
+    console.error("[email] Failed to prepare audit notification:", e);
   }
 
   return { data: { score }, error: null };

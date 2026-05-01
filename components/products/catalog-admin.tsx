@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -10,6 +10,7 @@ import {
   ChevronRight,
   FolderOpen,
   FolderClosed,
+  Hash,
   MoreHorizontal,
   Package,
   PackageCheck,
@@ -61,6 +62,7 @@ import {
   reorderCategories,
   reorderProducts,
   toggleProductStock,
+  updateProductStock,
 } from "@/app/(dashboard)/products/actions";
 import { formatPrice } from "@/lib/utils";
 import type { CategoryRow, ProductRow } from "@/lib/types";
@@ -69,12 +71,21 @@ import { ProductImageLightbox, type LightboxState } from "@/components/products/
 interface CatalogAdminProps {
   products: ProductRow[];
   categories: CategoryRow[];
+  userRole?: "admin" | "commissary";
 }
 
-export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
+export function CatalogAdmin({ products, categories, userRole = "admin" }: CatalogAdminProps) {
+  const isAdmin = userRole === "admin";
   const router = useRouter();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce search input (250ms)
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchQuery), 250);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
 
   // Dialogs
   const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false);
@@ -82,11 +93,14 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
   const [createProductCategoryId, setCreateProductCategoryId] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<CategoryRow | null>(null);
   const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null);
+  const [stockProduct, setStockProduct] = useState<ProductRow | null>(null);
+  const [stockInput, setStockInput] = useState<string>("");
   const [deletingCategory, setDeletingCategory] = useState<CategoryRow | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<ProductRow | null>(null);
   const [isDeleting, startDeleteTransition] = useTransition();
   const [isReordering, startReorderTransition] = useTransition();
   const [isTogglingStock, startStockTransition] = useTransition();
+  const [isSavingStock, startSaveStockTransition] = useTransition();
   const [lightbox, setLightbox] = useState<LightboxState>(null);
 
   const refresh = () => router.refresh();
@@ -104,14 +118,14 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
     setExpanded(new Set(categories.map((c) => c.id)));
   const collapseAll = () => setExpanded(new Set());
 
-  const isSearching = searchQuery.trim().length > 0;
+  const isSearching = debouncedSearch.trim().length > 0;
 
   // Filter products when searching
   const filteredProducts = useMemo(() => {
     if (!isSearching) return products;
-    const q = searchQuery.toLowerCase();
+    const q = debouncedSearch.toLowerCase();
     return products.filter((p) => p.name.toLowerCase().includes(q));
-  }, [products, searchQuery, isSearching]);
+  }, [products, debouncedSearch, isSearching]);
 
   // Group filtered products by category
   const productsByCategory: Record<string, ProductRow[]> = {};
@@ -128,9 +142,9 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
     : categories;
 
   // Auto-expand matching categories when searching
-  const prevSearchRef = useRef(searchQuery);
-  if (prevSearchRef.current !== searchQuery) {
-    prevSearchRef.current = searchQuery;
+  const prevSearchRef = useRef(debouncedSearch);
+  if (prevSearchRef.current !== debouncedSearch) {
+    prevSearchRef.current = debouncedSearch;
     if (isSearching && visibleCategories.length > 0) {
       setExpanded(new Set(visibleCategories.map((c) => c.id)));
     } else if (!isSearching) {
@@ -183,6 +197,35 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
     });
   };
 
+  const openStockDialog = (product: ProductRow) => {
+    setStockProduct(product);
+    setStockInput(product.stock_quantity != null ? String(product.stock_quantity) : "");
+  };
+
+  const handleSaveStock = (clear: boolean) => {
+    if (!stockProduct) return;
+    const trimmed = stockInput.trim();
+    let qty: number | null;
+    if (clear || trimmed === "") {
+      qty = null;
+    } else if (/^\d+$/.test(trimmed)) {
+      qty = Number(trimmed);
+    } else {
+      toast.error("Stock must be a whole number.");
+      return;
+    }
+    startSaveStockTransition(async () => {
+      const result = await updateProductStock(stockProduct.id, qty);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(qty == null ? "Stock tracking disabled." : "Stock quantity updated.");
+      setStockProduct(null);
+      refresh();
+    });
+  };
+
   const handleMoveCategory = (index: number, direction: "up" | "down") => {
     const swapIndex = direction === "up" ? index - 1 : index + 1;
     if (swapIndex < 0 || swapIndex >= categories.length) return;
@@ -227,25 +270,27 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
             </Button>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Dialog open={isCreateCategoryOpen} onOpenChange={setIsCreateCategoryOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Plus className="size-4 mr-2" />
-                  New Category
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create Category</DialogTitle>
-                </DialogHeader>
-                <CategoryForm
-                  onSuccess={() => {
-                    setIsCreateCategoryOpen(false);
-                    refresh();
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
+            {isAdmin && (
+              <Dialog open={isCreateCategoryOpen} onOpenChange={setIsCreateCategoryOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Plus className="size-4 mr-2" />
+                    New Category
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create Category</DialogTitle>
+                  </DialogHeader>
+                  <CategoryForm
+                    onSuccess={() => {
+                      setIsCreateCategoryOpen(false);
+                      refresh();
+                    }}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
             <Dialog
               open={isCreateProductOpen && !createProductCategoryId}
               onOpenChange={(open) => {
@@ -339,26 +384,30 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                         </div>
                       </button>
                       <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7 hidden sm:inline-flex"
-                          title="Move up"
-                          disabled={catIndex === 0 || isReordering}
-                          onClick={() => handleMoveCategory(catIndex, "up")}
-                        >
-                          <ArrowUp className="size-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7 hidden sm:inline-flex"
-                          title="Move down"
-                          disabled={catIndex === categories.length - 1 || isReordering}
-                          onClick={() => handleMoveCategory(catIndex, "down")}
-                        >
-                          <ArrowDown className="size-3.5" />
-                        </Button>
+                        {isAdmin && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 hidden sm:inline-flex"
+                              title="Move up"
+                              disabled={catIndex === 0 || isReordering}
+                              onClick={() => handleMoveCategory(catIndex, "up")}
+                            >
+                              <ArrowUp className="size-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 hidden sm:inline-flex"
+                              title="Move down"
+                              disabled={catIndex === categories.length - 1 || isReordering}
+                              onClick={() => handleMoveCategory(catIndex, "down")}
+                            >
+                              <ArrowDown className="size-3.5" />
+                            </Button>
+                          </>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -368,43 +417,45 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                         >
                           <Plus className="size-4" />
                         </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="size-7 sm:size-8">
-                              <MoreHorizontal className="size-4" />
-                              <span className="sr-only">Category actions</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              className="sm:hidden"
-                              disabled={catIndex === 0 || isReordering}
-                              onClick={() => handleMoveCategory(catIndex, "up")}
-                            >
-                              <ArrowUp className="size-4 mr-2" />
-                              Move up
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="sm:hidden"
-                              disabled={catIndex === categories.length - 1 || isReordering}
-                              onClick={() => handleMoveCategory(catIndex, "down")}
-                            >
-                              <ArrowDown className="size-4 mr-2" />
-                              Move down
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setEditingCategory(category)}>
-                              <Pencil className="size-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => setDeletingCategory(category)}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="size-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {isAdmin && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="size-7 sm:size-8">
+                                <MoreHorizontal className="size-4" />
+                                <span className="sr-only">Category actions</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                className="sm:hidden"
+                                disabled={catIndex === 0 || isReordering}
+                                onClick={() => handleMoveCategory(catIndex, "up")}
+                              >
+                                <ArrowUp className="size-4 mr-2" />
+                                Move up
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="sm:hidden"
+                                disabled={catIndex === categories.length - 1 || isReordering}
+                                onClick={() => handleMoveCategory(catIndex, "down")}
+                              >
+                                <ArrowDown className="size-4 mr-2" />
+                                Move down
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setEditingCategory(category)}>
+                                <Pencil className="size-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => setDeletingCategory(category)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="size-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
                     </div>
 
@@ -448,13 +499,24 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                                     </div>
                                   )}
                                   <div className="min-w-0">
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
                                       <span className="text-sm font-medium truncate">
                                         {product.name}
                                       </span>
                                       {!product.in_stock && (
                                         <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 shrink-0">
                                           Out of Stock
+                                        </span>
+                                      )}
+                                      {product.stock_quantity != null && (
+                                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0 ${
+                                          product.stock_quantity === 0
+                                            ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                            : product.stock_quantity <= 5
+                                              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                                        }`}>
+                                          {product.stock_quantity} in stock
                                         </span>
                                       )}
                                     </div>
@@ -525,6 +587,10 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                                           Mark In Stock
                                         </>
                                       )}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => openStockDialog(product)}>
+                                      <Hash className="size-4 mr-2" />
+                                      Set Stock Quantity
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => setEditingProduct(product)}>
                                       <Pencil className="size-4 mr-2" />
@@ -615,6 +681,69 @@ export function CatalogAdmin({ products, categories }: CatalogAdminProps) {
                 refresh();
               }}
             />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Set Stock Quantity Dialog */}
+      <Dialog open={!!stockProduct} onOpenChange={(open) => !open && setStockProduct(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set Stock Quantity</DialogTitle>
+          </DialogHeader>
+          {stockProduct && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-medium">{stockProduct.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  Leave blank to accept any order amount. Set a number to limit orders to that quantity.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium" htmlFor="stock-qty-input">
+                  Quantity
+                </label>
+                <Input
+                  id="stock-qty-input"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Leave blank for unlimited"
+                  value={stockInput}
+                  autoFocus
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === "" || /^\d*$/.test(raw)) setStockInput(raw);
+                  }}
+                />
+              </div>
+              <div className="flex justify-between gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => handleSaveStock(true)}
+                  disabled={isSavingStock}
+                >
+                  Clear (unlimited)
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStockProduct(null)}
+                    disabled={isSavingStock}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => handleSaveStock(false)}
+                    disabled={isSavingStock}
+                  >
+                    {isSavingStock ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>

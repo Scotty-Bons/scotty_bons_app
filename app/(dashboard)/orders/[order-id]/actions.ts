@@ -351,6 +351,44 @@ export async function editOrderItems(
   const productNameMap = new Map(productsData.map((p) => [p.id, p.name]));
   const modifierMap = new Map(modifiers.map((m) => [m.id, m]));
 
+  // Compute per-product stock deltas (new - old), so we can reserve/release
+  // tracked stock as part of the edit.
+  const { data: oldItems } = await supabase
+    .from("order_items")
+    .select("product_id, quantity")
+    .eq("order_id", orderId);
+
+  const oldQtyByProduct = new Map<string, number>();
+  for (const it of oldItems ?? []) {
+    oldQtyByProduct.set(it.product_id, (oldQtyByProduct.get(it.product_id) ?? 0) + it.quantity);
+  }
+
+  const newQtyByProduct = new Map<string, number>();
+  for (const item of items) {
+    const mod = modifierMap.get(item.modifier_id)!;
+    newQtyByProduct.set(mod.product_id, (newQtyByProduct.get(mod.product_id) ?? 0) + item.quantity);
+  }
+
+  const deltas: { product_id: string; delta: number }[] = [];
+  const productsTouched = new Set<string>([...oldQtyByProduct.keys(), ...newQtyByProduct.keys()]);
+  for (const pid of productsTouched) {
+    const delta = (newQtyByProduct.get(pid) ?? 0) - (oldQtyByProduct.get(pid) ?? 0);
+    if (delta !== 0) deltas.push({ product_id: pid, delta });
+  }
+
+  // Reserve/release stock first — RPC raises on insufficient and rolls back.
+  if (deltas.length > 0) {
+    const { error: stockError } = await supabase.rpc("adjust_stock_by_delta", {
+      p_changes: deltas,
+    });
+    if (stockError) {
+      if (stockError.message?.includes("Insufficient stock")) {
+        return { data: null, error: "Not enough stock to edit this order. Refresh and try again." };
+      }
+      return { data: null, error: "Failed to reconcile stock. Please try again." };
+    }
+  }
+
   // Delete existing items
   const { error: deleteError } = await supabase
     .from("order_items")
@@ -358,6 +396,12 @@ export async function editOrderItems(
     .eq("order_id", orderId);
 
   if (deleteError) {
+    // Roll back stock change
+    if (deltas.length > 0) {
+      await supabase.rpc("adjust_stock_by_delta", {
+        p_changes: deltas.map((d) => ({ product_id: d.product_id, delta: -d.delta })),
+      });
+    }
     return { data: null, error: "Failed to update order items." };
   }
 
@@ -379,6 +423,11 @@ export async function editOrderItems(
     .insert(newItems);
 
   if (insertError) {
+    if (deltas.length > 0) {
+      await supabase.rpc("adjust_stock_by_delta", {
+        p_changes: deltas.map((d) => ({ product_id: d.product_id, delta: -d.delta })),
+      });
+    }
     return { data: null, error: "Failed to update order items." };
   }
 

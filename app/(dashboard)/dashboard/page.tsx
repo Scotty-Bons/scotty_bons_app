@@ -222,9 +222,9 @@ export default async function DashboardPage({
   if (rangeToISO) auditsQuery = auditsQuery.lte("conducted_at", rangeToISO);
   if (storeFilterId !== "all") auditsQuery = auditsQuery.eq("store_id", storeFilterId);
 
+  // Round 1: fetch orders, stores, audits, products, categories in parallel
   const [
     ordersResult,
-    itemsResult,
     storesResult,
     completedAuditsResult,
     productsResult,
@@ -232,9 +232,6 @@ export default async function DashboardPage({
   ] = await timer.time("main-parallel-queries", () =>
     Promise.all([
       ordersQuery,
-      supabase
-        .from("order_items")
-        .select("order_id, product_name, modifier, unit_price, quantity"),
       supabase.from("stores").select("id, name"),
       auditsQuery,
       supabase.from("products").select("id, name, category_id, product_modifiers(label)"),
@@ -243,15 +240,23 @@ export default async function DashboardPage({
   );
 
   const orders = ordersResult.data ?? [];
-  const allRawItems = itemsResult.data ?? [];
   const stores = storesResult.data ?? [];
   const completedAudits = completedAuditsResult.data ?? [];
   const products = productsResult.data ?? [];
   const categories = categoriesResult.data ?? [];
 
-  // Filter items to only those belonging to orders in the date range
-  const orderIdSet = new Set(orders.map((o) => o.id));
-  const allItems = allRawItems.filter((item) => orderIdSet.has(item.order_id));
+  // Round 2: fetch only order_items that belong to the filtered orders
+  const orderIds = orders.map((o) => o.id);
+  let allItems: { order_id: string; product_name: string; modifier: string; unit_price: number; quantity: number }[] = [];
+  if (orderIds.length > 0) {
+    const { data: itemsData } = await timer.time("order_items.select(filtered)", () =>
+      supabase
+        .from("order_items")
+        .select("order_id, product_name, modifier, unit_price, quantity")
+        .in("order_id", orderIds)
+    );
+    allItems = itemsData ?? [];
+  }
 
   // ── Maps ──
   const storeNameMap: Record<string, string> = {};

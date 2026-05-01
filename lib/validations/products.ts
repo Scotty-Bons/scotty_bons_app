@@ -35,6 +35,13 @@ export const createProductSchema = z.object({
     .min(2, "Product name must be at least 2 characters.")
     .max(200, "Product name must be at most 200 characters."),
   category_id: z.string().uuid("Invalid category."),
+  stock_quantity: z
+    .number({ error: "Stock must be a whole number." })
+    .int("Stock must be a whole number.")
+    .min(0, "Stock cannot be negative.")
+    .max(2147483647)
+    .nullable()
+    .optional(),
   modifiers: z
     .array(modifierSchema)
     .min(1, "At least one modifier is required."),

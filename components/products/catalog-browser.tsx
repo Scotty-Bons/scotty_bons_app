@@ -23,17 +23,24 @@ export function CatalogBrowser({ categories, products, userRole }: CatalogBrowse
   const router = useRouter();
   const [activeCategory, setActiveCategory] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [isTogglingStock, startStockTransition] = useTransition();
   const observerRef = useRef<IntersectionObserver | null>(null);
   const canToggleStock = userRole === "commissary";
   const [lightbox, setLightbox] = useState<LightboxState>(null);
 
-  // Filter products by search query
+  // Debounce search input (250ms)
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchQuery), 250);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
+
+  // Filter products by debounced search query
   const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return products;
-    const q = searchQuery.toLowerCase();
+    if (!debouncedSearch.trim()) return products;
+    const q = debouncedSearch.toLowerCase();
     return products.filter((p) => p.name.toLowerCase().includes(q));
-  }, [products, searchQuery]);
+  }, [products, debouncedSearch]);
 
   // Group products by category_id
   const productsByCategory = useMemo(() => {
@@ -211,11 +218,22 @@ export function CatalogBrowser({ categories, products, userRole }: CatalogBrowse
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-sm font-medium truncate">{product.name}</span>
                         {!product.in_stock && (
                           <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 shrink-0">
                             Out of Stock
+                          </span>
+                        )}
+                        {product.stock_quantity != null && (
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0 ${
+                            product.stock_quantity === 0
+                              ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                              : product.stock_quantity <= 5
+                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                          }`}>
+                            {product.stock_quantity} in stock
                           </span>
                         )}
                       </div>

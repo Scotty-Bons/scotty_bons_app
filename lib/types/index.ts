@@ -53,6 +53,7 @@ export type ProductRow = {
   images: ProductImageRow[];
   sort_order: number;
   in_stock: boolean;
+  stock_quantity: number | null;
   modifiers: ProductModifierRow[];
 };
 

@@ -59,6 +59,9 @@ export function ProductForm({ categories, product, defaultCategoryId, onSuccess 
       return map;
     },
   );
+  const [stockDisplay, setStockDisplay] = useState<string>(
+    () => product?.stock_quantity != null ? String(product.stock_quantity) : ""
+  );
   const [images, setImages] = useState<ImageEntry[]>(
     () => product?.images?.map((img) => ({ id: img.id, url: img.url })) ?? []
   );
@@ -72,6 +75,7 @@ export function ProductForm({ categories, product, defaultCategoryId, onSuccess 
     defaultValues: {
       name: product?.name ?? "",
       category_id: product?.category_id ?? defaultCategoryId ?? "",
+      stock_quantity: product?.stock_quantity ?? null,
       modifiers:
         product?.modifiers?.map((m) => ({
           id: m.id,
@@ -177,6 +181,7 @@ export function ProductForm({ categories, product, defaultCategoryId, onSuccess 
 
         form.reset();
         setPriceDisplays({});
+        setStockDisplay("");
         setImages([]);
         setNewFiles([]);
         setRemovedImageIds([]);
@@ -225,6 +230,39 @@ export function ProductForm({ categories, product, defaultCategoryId, onSuccess 
                   ))}
                 </SelectContent>
               </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="stock_quantity"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Stock Quantity (optional)</FormLabel>
+              <FormControl>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Leave blank for unlimited"
+                  value={stockDisplay}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === "") {
+                      setStockDisplay("");
+                      field.onChange(null);
+                    } else if (/^\d+$/.test(raw)) {
+                      setStockDisplay(raw);
+                      field.onChange(Number(raw));
+                    }
+                  }}
+                  onBlur={field.onBlur}
+                />
+              </FormControl>
+              <p className="text-xs text-muted-foreground">
+                When set, orders are limited to the available quantity. Leave blank to accept any order amount.
+              </p>
               <FormMessage />
             </FormItem>
           )}

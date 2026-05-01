@@ -225,27 +225,7 @@ export async function deleteUser(
 
   const adminClient = createAdminClient();
 
-  // Check if user has submitted orders
-  const { count: orderCount } = await adminClient
-    .from("orders")
-    .select("id", { count: "exact", head: true })
-    .eq("submitted_by", userId);
-
-  if (orderCount && orderCount > 0) {
-    return { data: null, error: "Cannot delete a user that has submitted orders. Deactivate instead." };
-  }
-
-  // Check if user has conducted audits
-  const { count: auditCount } = await adminClient
-    .from("audits")
-    .select("id", { count: "exact", head: true })
-    .eq("conducted_by", userId);
-
-  if (auditCount && auditCount > 0) {
-    return { data: null, error: "Cannot delete a user that has conducted audits. Deactivate instead." };
-  }
-
-  // Delete auth user — profile is CASCADE deleted automatically
+  // Delete auth user — profile is CASCADE deleted, order/audit references become NULL
   const { error } = await adminClient.auth.admin.deleteUser(userId);
   if (error) return { data: null, error: "Failed to delete user. Please try again." };
 

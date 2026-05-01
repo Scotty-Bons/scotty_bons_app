@@ -96,7 +96,21 @@
       "Bash(npm install:*)",
       "Bash(find /c/Padoque/scotty-ops/app -type f \\\\\\(-name *.tsx -o -name *.ts -o -name *.jsx -o -name *.js \\\\\\))",
       "Bash(find /c/Padoque/scotty-ops/components -type f \\\\\\(-name *.tsx -o -name *.ts -o -name *.jsx -o -name *.js \\\\\\))",
-      "Bash(find /c/Padoque/scotty-ops -type f \\\\\\(-name *.css -o -name globals.css \\\\\\) -not -path */node_modules/*)"
+      "Bash(find /c/Padoque/scotty-ops -type f \\\\\\(-name *.css -o -name globals.css \\\\\\) -not -path */node_modules/*)",
+      "Bash(npx tsx:*)",
+      "Read(//c/Users/gusta/Downloads/**)",
+      "Bash(npx --yes sharp-cli --help)",
+      "Bash(npx --yes sharp-cli -i public/login-hero.jpg -o public/login-hero-opt.jpg --quality 80 --resize 1920)",
+      "Bash(npx sharp-cli:*)",
+      "Bash(find /c/Padoque/scotty-ops -type f \\\\\\(-name *.sql -o -name schema.prisma -o -name migrations* \\\\\\))",
+      "Bash(npx shadcn@latest:*)",
+      "Read(//tmp/**)",
+      "Read(//c/Padoque/**)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(cygpath -w /tmp/quick-dev-review-input.txt)",
+      "Bash(npx eslint *)",
+      "Bash(git stash *)",
+      "Bash(echo \"EXITCODE=$?\")"
     ]
   }
 }

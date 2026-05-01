@@ -173,7 +173,7 @@ export async function createProduct(
     return { data: null, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
-  const supabase = await verifyAdmin();
+  const supabase = await verifyAdminOrCommissary();
   if (!supabase) return { data: null, error: "Unauthorized." };
 
   // Assign sort_order to end of category
@@ -194,6 +194,7 @@ export async function createProduct(
       name: parsed.data.name,
       category_id: parsed.data.category_id,
       sort_order: nextProductSort,
+      stock_quantity: parsed.data.stock_quantity ?? null,
     })
     .select("id")
     .single();
@@ -241,15 +242,16 @@ export async function updateProduct(
     return { data: null, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
-  const supabase = await verifyAdmin();
+  const supabase = await verifyAdminOrCommissary();
   if (!supabase) return { data: null, error: "Unauthorized." };
 
-  // Update product name/category
+  // Update product name/category/stock
   const { error } = await supabase
     .from("products")
     .update({
       name: parsed.data.name,
       category_id: parsed.data.category_id,
+      stock_quantity: parsed.data.stock_quantity ?? null,
     })
     .eq("id", productId)
     .select("id")
@@ -298,7 +300,7 @@ export async function deleteProduct(
   const idParsed = idSchema.safeParse(productId);
   if (!idParsed.success) return { data: null, error: "Invalid product ID." };
 
-  const supabase = await verifyAdmin();
+  const supabase = await verifyAdminOrCommissary();
   if (!supabase) return { data: null, error: "Unauthorized." };
 
   const { error } = await supabase
@@ -329,7 +331,7 @@ export async function uploadProductImage(
   const idParsed = idSchema.safeParse(productId);
   if (!idParsed.success) return { data: null, error: "Invalid product ID." };
 
-  const supabase = await verifyAdmin();
+  const supabase = await verifyAdminOrCommissary();
   if (!supabase) return { data: null, error: "Unauthorized." };
 
   // Check current image count
@@ -403,7 +405,7 @@ export async function removeProductImage(
   const idParsed = idSchema.safeParse(imageId);
   if (!idParsed.success) return { data: null, error: "Invalid image ID." };
 
-  const supabase = await verifyAdmin();
+  const supabase = await verifyAdminOrCommissary();
   if (!supabase) return { data: null, error: "Unauthorized." };
 
   const { data: image } = await supabase
@@ -473,7 +475,7 @@ export async function reorderProducts(
   const parsed = reorderSchema.safeParse(orderedIds);
   if (!parsed.success) return { data: null, error: "Invalid input." };
 
-  const supabase = await verifyAdmin();
+  const supabase = await verifyAdminOrCommissary();
   if (!supabase) return { data: null, error: "Unauthorized." };
 
   const updates = parsed.data.map((id, index) =>
@@ -490,6 +492,45 @@ export async function reorderProducts(
     return { data: null, error: "Failed to reorder products. Please try again." };
   }
 
+  return { data: null, error: null };
+}
+
+// ── Stock quantity ────────────────────────────────────────────────────────────
+
+const stockQuantitySchema = z
+  .number()
+  .int("Stock must be a whole number.")
+  .min(0, "Stock cannot be negative.")
+  .max(2147483647)
+  .nullable();
+
+export async function updateProductStock(
+  productId: string,
+  quantity: number | null
+): Promise<ActionResult<null>> {
+  const idParsed = idSchema.safeParse(productId);
+  if (!idParsed.success) return { data: null, error: "Invalid product ID." };
+
+  const qtyParsed = stockQuantitySchema.safeParse(quantity);
+  if (!qtyParsed.success) {
+    return { data: null, error: qtyParsed.error.issues[0]?.message ?? "Invalid stock quantity." };
+  }
+
+  const supabase = await verifyAdminOrCommissary();
+  if (!supabase) return { data: null, error: "Unauthorized." };
+
+  const { error } = await supabase
+    .from("products")
+    .update({ stock_quantity: qtyParsed.data })
+    .eq("id", productId)
+    .eq("active", true)
+    .select("id")
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return { data: null, error: "Product not found." };
+    return { data: null, error: "Failed to update stock quantity." };
+  }
   return { data: null, error: null };
 }
 

@@ -102,16 +102,23 @@ export function NewOrderCart({ categories, products, storeId, stores }: NewOrder
   const [selectedStoreId, setSelectedStoreId] = useState<string>(storeId ?? "");
   const [lightbox, setLightbox] = useState<LightboxState>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedModifiers, setSelectedModifiers] = useState<Record<string, string>>({});
   const isAdmin = !!stores;
   const observerRef = useRef<IntersectionObserver | null>(null);
 
-  // Filter products by search query
+  // Debounce search input (250ms)
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchQuery), 250);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
+
+  // Filter products by debounced search query
   const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return products;
-    const q = searchQuery.toLowerCase();
+    if (!debouncedSearch.trim()) return products;
+    const q = debouncedSearch.toLowerCase();
     return products.filter((p) => p.name.toLowerCase().includes(q));
-  }, [products, searchQuery]);
+  }, [products, debouncedSearch]);
 
   // Group products by category
   const productsByCategory = useMemo(() => {
@@ -136,6 +143,25 @@ export function NewOrderCart({ categories, products, storeId, stores }: NewOrder
     (sum, item) => sum + item.unit_price * item.quantity,
     0
   );
+
+  // Lookup helpers for stock-aware caps in the review phase
+  const productById = useMemo(
+    () => new Map(products.map((p) => [p.id, p])),
+    [products]
+  );
+  const cartQtyByProduct = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of cartItems) {
+      map.set(item.product_id, (map.get(item.product_id) ?? 0) + item.quantity);
+    }
+    return map;
+  }, [cartItems]);
+  const maxQuantityFor = (item: CartItem): number => {
+    const product = productById.get(item.product_id);
+    if (!product || product.stock_quantity == null) return Number.MAX_SAFE_INTEGER;
+    const otherQty = (cartQtyByProduct.get(item.product_id) ?? 0) - item.quantity;
+    return Math.max(0, product.stock_quantity - otherQty);
+  };
 
   // IntersectionObserver for sticky category nav
   useEffect(() => {
@@ -262,7 +288,10 @@ export function NewOrderCart({ categories, products, storeId, stores }: NewOrder
           </CardHeader>
           <CardContent>
             <div className="rounded-md border divide-y">
-              {cartItems.map((item) => (
+              {cartItems.map((item) => {
+                const maxQty = maxQuantityFor(item);
+                const atCap = item.quantity >= maxQty;
+                return (
                 <div
                   key={item.modifier_id}
                   className="px-4 py-3 space-y-2"
@@ -309,6 +338,7 @@ export function NewOrderCart({ categories, products, storeId, stores }: NewOrder
                       <Input
                         type="number"
                         min={1}
+                        max={Number.isFinite(maxQty) ? maxQty : undefined}
                         value={item.quantity}
                         onChange={(e) => {
                           const val = parseInt(e.target.value, 10);
@@ -317,7 +347,7 @@ export function NewOrderCart({ categories, products, storeId, stores }: NewOrder
                               type: "UPDATE_QUANTITY",
                               payload: {
                                 modifier_id: item.modifier_id,
-                                quantity: Math.max(1, val),
+                                quantity: Math.max(1, Math.min(val, maxQty)),
                               },
                             });
                           }
@@ -328,6 +358,7 @@ export function NewOrderCart({ categories, products, storeId, stores }: NewOrder
                         variant="outline"
                         size="icon"
                         className="size-8"
+                        disabled={atCap}
                         onClick={() =>
                           dispatch({
                             type: "UPDATE_QUANTITY",
@@ -346,7 +377,8 @@ export function NewOrderCart({ categories, products, storeId, stores }: NewOrder
                     </span>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="flex justify-between items-center mt-4 pt-4 border-t">
@@ -453,11 +485,22 @@ export function NewOrderCart({ categories, products, storeId, stores }: NewOrder
             <CardContent>
               <div className="rounded-md border divide-y">
                 {(productsByCategory.get(cat.id) ?? []).map((product) => {
-                  const outOfStock = !product.in_stock;
                   const hasMultipleModifiers = product.modifiers.length > 1;
                   const activeModifierId = selectedModifiers[product.id] ?? product.modifiers[0]?.id;
                   const activeModifier = product.modifiers.find((m) => m.id === activeModifierId) ?? product.modifiers[0];
                   const inCart = activeModifier ? cart.items.get(activeModifier.id) : undefined;
+                  // Stock-aware availability: sum quantities across all modifiers of this
+                  // product because stock is product-level.
+                  const cartQtyForProduct = product.modifiers.reduce(
+                    (sum, m) => sum + (cart.items.get(m.id)?.quantity ?? 0),
+                    0
+                  );
+                  const stockTracked = product.stock_quantity != null;
+                  const remaining = stockTracked
+                    ? Math.max(0, (product.stock_quantity ?? 0) - cartQtyForProduct)
+                    : Infinity;
+                  const outOfStock = !product.in_stock || (stockTracked && (product.stock_quantity ?? 0) === 0);
+                  const canAddMore = !outOfStock && remaining > 0;
                   return (
                     <div
                       key={product.id}
@@ -491,11 +534,22 @@ export function NewOrderCart({ categories, products, storeId, stores }: NewOrder
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-sm font-medium truncate">{product.name}</span>
                           {outOfStock && (
                             <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 shrink-0">
                               Out of Stock
+                            </span>
+                          )}
+                          {stockTracked && !outOfStock && (
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0 ${
+                              remaining === 0
+                                ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                : remaining <= 5
+                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                            }`}>
+                              {remaining} left
                             </span>
                           )}
                         </div>
@@ -553,13 +607,22 @@ export function NewOrderCart({ categories, products, storeId, stores }: NewOrder
                               variant="outline"
                               size="icon"
                               className="size-8"
+                              disabled={!canAddMore}
                               onClick={() => dispatch({ type: "UPDATE_QUANTITY", payload: { modifier_id: activeModifier.id, quantity: inCart.quantity + 1 } })}
                             >
                               <Plus className="size-3" />
                             </Button>
                           </div>
                         ) : (
-                          <Button variant="outline" size="sm" onClick={() => handleAddModifier(product, activeModifier)} className="min-w-[44px]">Add</Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={!canAddMore}
+                            onClick={() => handleAddModifier(product, activeModifier)}
+                            className="min-w-[44px]"
+                          >
+                            Add
+                          </Button>
                         )}
                       </div>
                     </div>
