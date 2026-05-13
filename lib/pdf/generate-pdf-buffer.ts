@@ -317,15 +317,30 @@ import type { RatingOption } from "@/lib/types";
 import { DEFAULT_RATING_OPTIONS } from "@/lib/types";
 import { getRatingPdfColor } from "@/lib/constants/audit-status";
 
+type AuditPdfBufferItem = {
+  label: string;
+  rating: string | null;
+  notes: string | null;
+  ratingLabels?: RatingOption[];
+};
+
 export function generateAuditPdfBuffer(
   audit: { score: number | null; conducted_at: string | null; notes: string | null },
-  categories: { name: string; items: { label: string; rating: string | null; notes: string | null }[] }[],
+  categories: { name: string; items: AuditPdfBufferItem[] }[],
   storeName: string,
   templateName: string,
   conductorName: string,
   ratingOptions: RatingOption[] = DEFAULT_RATING_OPTIONS,
 ): Buffer {
-  const ratingMap = new Map(ratingOptions.map((r) => [r.key, r]));
+  const globalRatingMap = new Map(ratingOptions.map((r) => [r.key, r]));
+  const resolveRating = (item: AuditPdfBufferItem) => {
+    if (!item.rating) return undefined;
+    if (item.ratingLabels) {
+      const hit = item.ratingLabels.find((r) => r.key === item.rating);
+      if (hit) return hit;
+    }
+    return globalRatingMap.get(item.rating);
+  };
   const doc = new jsPDF();
   const dateFmt = new Intl.DateTimeFormat("en-CA", { dateStyle: "long" });
 
@@ -351,11 +366,14 @@ export function generateAuditPdfBuffer(
     doc.text(cat.name, 14, startY);
     startY += 2;
 
-    const tableData = cat.items.map((item) => [
-      item.label,
-      item.rating ? (ratingMap.get(item.rating)?.label ?? item.rating) : "—",
-      item.notes ?? "",
-    ]);
+    const tableData = cat.items.map((item) => {
+      const opt = resolveRating(item);
+      return [
+        item.label,
+        item.rating ? (opt?.label ?? item.rating) : "—",
+        item.notes ?? "",
+      ];
+    });
 
     autoTable(doc, {
       startY,
@@ -367,8 +385,8 @@ export function generateAuditPdfBuffer(
       columnStyles: { 0: { cellWidth: 70 }, 2: { cellWidth: 70 } },
       didParseCell: (data) => {
         if (data.section === "body" && data.column.index === 1) {
-          const rating = cat.items[data.row.index]?.rating;
-          const opt = rating ? ratingMap.get(rating) : undefined;
+          const item = cat.items[data.row.index];
+          const opt = item ? resolveRating(item) : undefined;
           if (opt) {
             data.cell.styles.textColor = getRatingPdfColor(opt.weight);
             data.cell.styles.fontStyle = "bold";

@@ -11,6 +11,7 @@ interface AuditPdfCategory {
     label: string;
     rating: string | null;
     notes: string | null;
+    ratingLabels?: { key: string; label: string; weight: number }[];
   }[];
 }
 

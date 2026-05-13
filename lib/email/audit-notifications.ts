@@ -27,7 +27,7 @@ export async function notifyAuditCompleted({
   score: number;
   conductorName: string;
   auditData?: { score: number | null; conducted_at: string | null; notes: string | null };
-  categories?: { name: string; items: { label: string; rating: string | null; notes: string | null }[] }[];
+  categories?: { name: string; items: { label: string; rating: string | null; notes: string | null; ratingLabels?: RatingOption[] }[] }[];
   ratingOptions?: RatingOption[];
 }): Promise<void> {
   const supabase = await createClient();

@@ -196,6 +196,7 @@ export default async function AuditDetailPage({
                   label: item.label,
                   rating: responseMap[item.id]?.rating ?? null,
                   notes: responseMap[item.id]?.notes ?? null,
+                  ratingLabels: item.rating_labels,
                 })),
               }))}
               storeName={store?.name ?? "Unknown Store"}

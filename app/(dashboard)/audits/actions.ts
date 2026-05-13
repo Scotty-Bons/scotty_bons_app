@@ -230,7 +230,7 @@ export async function completeAudit(
     // Fetch categories, items, and responses for PDF attachment
     const [{ data: cats }, { data: tplItems }, { data: responses }] = await Promise.all([
       auth.supabase.from("audit_template_categories").select("id, name, sort_order").eq("template_id", audit.template_id).order("sort_order"),
-      auth.supabase.from("audit_template_items").select("id, category_id, label, sort_order").eq("template_id", audit.template_id).order("sort_order"),
+      auth.supabase.from("audit_template_items").select("id, category_id, label, sort_order, rating_labels").eq("template_id", audit.template_id).order("sort_order"),
       auth.supabase.from("audit_responses").select("template_item_id, rating, notes").eq("audit_id", audit.id),
     ]);
 
@@ -248,6 +248,7 @@ export async function completeAudit(
           label: i.label,
           rating: responseMap[i.id]?.rating ?? null,
           notes: responseMap[i.id]?.notes ?? null,
+          ratingLabels: i.rating_labels as import("@/lib/types").RatingOption[] | undefined,
         })),
     }));
 
