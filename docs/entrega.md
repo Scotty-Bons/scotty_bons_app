@@ -73,7 +73,7 @@ Extra features:
 - Automatic email on every relevant status change
 
 ### 3.3 Products and categories
-Admin-only. Each product has:
+Managed by admin and commissary; stores see the catalog in read-only mode. Each product has:
 
 - Name, price, category
 - **Multiple images** (sortable)
@@ -81,7 +81,7 @@ Admin-only. Each product has:
 - **Out of stock** toggle (stays visible in the catalog but cannot be ordered)
 - Soft delete: the product leaves the catalog but does not disappear from past history
 
-Stores see the catalog in read-only mode, with name search.
+Stores can browse and search the catalog but cannot create or edit products.
 
 ### 3.4 Invoices
 Generated **automatically** when an order is fulfilled. Characteristics:
@@ -131,8 +131,7 @@ Any user (regardless of role) can change their own **password** and
 
 ## 4. How to access the system
 
-1. Open `https://<your-domain>` (to be defined at go-live, usually
-   something like `https://app.padoque.com.br`).
+1. Open **[https://app.scottybonsgrill.com](https://app.scottybonsgrill.com)**.
 2. Login screen: email + password.
 3. Forgot your password: click **"Forgot my password"** → a reset link arrives by email.
 4. Change password: log in → user menu → **Settings**.
@@ -147,19 +146,17 @@ Any user (regardless of role) can change their own **password** and
 Scotty-Ops relies on **four external services**. Each has a clear purpose
 and all of them are managed from a web dashboard:
 
-| Service | Purpose | Recommended plan | Monthly cost |
-|---------|---------|------------------|--------------|
-| **GitHub** | Stores the source code | Free or Team | Free |
-| **Supabase** | Database, login, files | Pro | ~US$ 25 |
-| **Vercel** | Hosts the website | Pro (commercial use) | ~US$ 20/user |
-| **Resend** | Sends system emails | Free → Pro above 3,000 emails/month | US$ 0–20 |
+| Service | Purpose | Dashboard | Plan |
+|---------|---------|-----------|------|
+| **GitHub** | Stores the source code | [github.com](https://github.com) | Free or Team |
+| **Supabase** | Database, login, files | [supabase.com/dashboard](https://supabase.com/dashboard) | Pro (~US$ 25/mo) |
+| **Vercel** | Hosts the website | [vercel.com/dashboard](https://vercel.com/dashboard) | Pro (~US$ 20/user/mo) |
+| **Resend** | Sends system emails | [resend.com](https://resend.com) | Free → Pro above 3,000 emails/mo |
 
-> Approximate total cost: **US$ 45–65/month** at the start. Each service
-> charges the corporate credit card separately, one invoice per service.
+> All four accounts are registered under **info@scottybonsgrill.com**. Use this email to log in to each service dashboard.
 
 ### Important recommendations
-- Use **one shared corporate email** (e.g. `it@padoque.com.br`) for all four accounts. **Never a personal email.**
-- **Enable 2FA** (two-factor authentication) everywhere.
+- **Enable 2FA** (two-factor authentication) on all four accounts.
 - Keep every password in a **password manager** (1Password, Bitwarden). **Never** send credentials over WhatsApp or email.
 
 ---
@@ -244,13 +241,13 @@ Everything in this list is done **by the admin, directly inside the system**:
 | Excel | `xlsx` |
 | Validation | `zod` + `react-hook-form` |
 | Charts | `recharts` |
-| Hosting | **Vercel** (Edge Runtime for middleware) |
+| Hosting | **Vercel** (Edge Runtime) |
 
 ### 9.2 Folder structure
 ```
 app/
   (auth)/          Public routes: login, forgot-password, update-password
-  (dashboard)/     Authenticated routes (middleware redirects by role)
+  (dashboard)/     Authenticated routes (proxy.ts redirects by role)
     dashboard/     KPIs and charts
     orders/        Orders (list, detail, new)
     products/      Catalog and categories
@@ -258,6 +255,7 @@ app/
     audits/        Audits + templates
     users/         User management (admin)
     settings/      Company settings
+    documentation/ This handover guide (admin)
 components/        Feature-grouped React components
 lib/
   supabase/        Client init, auth helpers
@@ -314,7 +312,7 @@ Required environment variables:
 
 ### 9.6 Project-specific caveats
 
-- **`middleware.ts`** handles session (Supabase cookies), role-based redirects
+- **`proxy.ts`** (not `middleware.ts`) handles session (Supabase cookies), role-based redirects
   and banned-user blocking. If anything fails during login, start there.
 - **Soft delete** is the default for products and orders — be careful
   writing queries without `is_deleted = false`.
@@ -334,11 +332,11 @@ Required environment variables:
 
 ## 10. Final deliverables
 
-- [x] Full source code in the Padoque GitHub repository
-- [x] Supabase database provisioned in the Padoque account, with production data
-- [x] Vercel production deploy in the Padoque account
-- [x] Application domain configured
-- [x] Resend transactional emails active in the Padoque account
+- [x] Full source code in the Scotty Bons GitHub repository
+- [x] Supabase database provisioned in the Scotty Bons account (info@scottybonsgrill.com), with production data
+- [x] Vercel production deploy in the Scotty Bons account (info@scottybonsgrill.com)
+- [x] Application domain configured — https://app.scottybonsgrill.com
+- [x] Resend transactional emails active in the Scotty Bons account (info@scottybonsgrill.com)
 - [x] Initial admin user created
 - [x] Initial product catalog loaded
 - [x] Baseline audit template created
@@ -350,8 +348,8 @@ Required environment variables:
 
 | Purpose | Contact |
 |---------|---------|
-| Usage questions (admin/store) | Padoque administrator |
-| Evolutive maintenance / bugs | Current developer (see repository commits) |
-| Infra status (site is down) | vercel.com/status · status.supabase.com · resend.com/status |
+| Usage questions (admin/store) | Scotty Bons administrator |
+| Evolutive maintenance / bugs | **Gustavo** — gustavo@equipepadoque.com.br · +55 31 97338-6815 |
+| Infra status (site is down) | [vercel.com/status](https://vercel.com/status) · [status.supabase.com](https://status.supabase.com) · [resend.com/status](https://resend.com/status) |
 
-> **Last updated:** 2026-04-17.
+> **Last updated:** 2026-05-13.

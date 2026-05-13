@@ -1,4 +1,4 @@
-import { ClipboardCheck, FileText, LayoutDashboard, Package, Settings, ShoppingBasket, Users } from "lucide-react";
+import { BookOpen, ClipboardCheck, FileText, LayoutDashboard, Package, Settings, ShoppingBasket, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export interface NavItem {
@@ -16,4 +16,5 @@ export const allNavItems: NavItem[] = [
   { href: "/products", label: "Products", icon: ShoppingBasket, roles: ["admin", "commissary", "store"] },
   { href: "/users", label: "Users & Stores", icon: Users, roles: ["admin"] },
   { href: "/settings", label: "Settings", icon: Settings, roles: ["admin"] },
+  { href: "/documentation", label: "Documentation", icon: BookOpen, roles: ["admin"] },
 ];
