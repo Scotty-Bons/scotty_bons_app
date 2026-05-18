@@ -1,355 +1,184 @@
-# Scotty-Ops — Project Handover
+# Scotty-Ops — Handover
 
-> Official handover document for the **Scotty-Ops** system, developed for
-> Padoque. It covers what the system does, how to use it, how to run
-> day-to-day maintenance, and who to turn to when something needs to be
-> changed "under the hood".
->
-> **Recommended audience:** leadership, management, and the admin team
-> should read from the cover up to the section **"For the future technical
-> team"**. The final section is written for whoever takes over development.
+Operations platform for the Padoque / Scotty Bons network: stores place supply orders with the commissary, the commissary fulfills them and the system generates invoices automatically. It also runs the quality audit program and powers the management dashboards.
 
 ---
 
-## 1. What Scotty-Ops is
+## 1. Who can do what
 
-Scotty-Ops is the **operations web platform** for the Padoque network.
-It connects three worlds that used to live in spreadsheets, WhatsApp and paper:
+| Role | What they see and do |
+|------|----------------------|
+| **Admin** | Everything: users, products, orders, invoices, audits, settings, dashboards |
+| **Commissary** | Receives, approves/declines and fulfills orders. Visits stores and runs audits. Sees the catalog and dashboards. Does **not** see financial settings or user management |
+| **Store** | Places orders. Sees only **its own** orders, invoices and audit results |
 
-- **Stores** place supply orders with the central commissary.
-- **The commissary** receives, approves and fulfills those orders, and also
-  visits stores to run quality audits.
-- **Administration** follows everything in real time, generates invoices,
-  configures the network and analyzes indicators.
-
-All in a single place, with history, traceability and clear
-per-role permissions.
+Each store only sees its own data — this is enforced by the database itself, not just by the website.
 
 ---
 
-## 2. How the system is organized
+## 2. How each module works
 
-The system is built around **three user types**, each landing on a
-different "door" after login:
+### Orders
+- Flow: **Submitted → Approved → Fulfilled** (or **Declined** at any point before fulfillment).
+- Every status change is recorded in the order history (who, when, what).
+- An approved order can still be edited (items / quantities) by admin or commissary — the edit is logged in the history too.
+- When the commissary marks an order as **fulfilled**, the **invoice is generated automatically**. There is no separate "create invoice" step.
+- An email is sent on every relevant status change. If email sending fails for any reason, the order action still goes through — emails never block operations.
 
-| Role | What they do | What they do NOT see |
-|------|--------------|----------------------|
-| **Admin** | Everything: users, products, orders, invoices, audits, settings, dashboards | — |
-| **Commissary** | Receives orders, approves/declines, fulfills them and generates invoices. Visits stores and runs audits | Financial settings and user management |
-| **Store** | Places orders, tracks its own history, sees its own invoices and audit results | Orders / invoices / audits from other stores |
+### Products
+- **Deleting a product is "soft"**: it leaves the catalog but stays visible in old orders and invoices. Past history is never lost.
+- **Modifiers** (e.g. sizes, flavours, with their own prices) are mandatory — every order line refers to a modifier, not just the product.
+- **Out of stock toggle**: hides the product from new orders but keeps it visible in the catalog.
+- **Optional stock control per product**:
+  - If the product has no stock quantity set → unlimited (current default).
+  - If a stock quantity is set → the system subtracts on each new order and **gives stock back automatically** when the order is declined or deleted (as long as it had not been fulfilled).
+- Products support multiple images, sortable, with gallery preview.
 
-> This separation is enforced by the **database itself** (not only by the
-> website), so a Store user **cannot** see data from another store, not
-> even with external tools.
+### Invoices
+- **Cannot be edited or deleted** once issued (accounting requirement).
+- Numbered sequentially: `INV-YYYY-0001`, `INV-YYYY-0002`, … No gaps, no duplicates, even if many orders are fulfilled at the same second.
+- Each invoice freezes the company data, tax (HST %) and royalties % **as configured at the moment it was issued**. Changing settings later does not change old invoices.
+- The royalties / advertising fee is a **flat fee applied once per order**, not per item.
+- Can be exported as PDF.
 
----
+### Audits
+- Templates are built by admin: categories → questions, each with a rating scale and custom labels/weights.
+- Commissary fills the audit on phone or computer, optionally attaching **photo evidence** (up to 3 photos per question, JPEG/PNG/WebP, max 2 MB each).
+- Score is calculated automatically from the answers.
+- Templates can be **duplicated** to speed up creation of variants.
+- When an audit is submitted, the store admins receive an email notification.
+- Reports exportable as PDF.
 
-## 3. System modules (user view)
+### Users
+- **Deactivate** a user → access is revoked immediately, even if they have a session open. History (orders, audits) is preserved.
+- **Delete** is only allowed for users with no important history. The system blocks deletion otherwise. Use deactivate in normal cases.
 
-### 3.1 Dashboard
-Home page for admin and commissary users. Shows:
+### Settings (admin only)
+- Company info shown on invoices.
+- **Tax rate (HST %)** and **royalties %** applied to new invoices.
+- Per-store billing info.
+- Any user can change their **own** email and password from their profile, regardless of role.
 
-- Total orders by status
-- Order value over time
-- Store compliance ranking (average audit score)
-- Most ordered products
-- Filters by period (7 days, 30 days, 3 months, 6 months) and by store
-
-### 3.2 Orders
-Full supply-order workflow:
-
-1. The store builds its cart from the catalog and **submits**.
-2. The commissary sees it in real time, marks it **under review**,
-   **approves** or **declines**.
-3. When delivered, it's marked **fulfilled** — the system automatically
-   generates the **invoice**.
-4. Every status change is recorded in the order history.
-
-Extra features:
-
-- Search and filters by status, period, store, order number
-- Editing approved orders (with the change logged in history)
-- Product images inside the cart
-- Automatic email on every relevant status change
-
-### 3.3 Products and categories
-Managed by admin and commissary; stores see the catalog in read-only mode. Each product has:
-
-- Name, price, category
-- **Multiple images** (sortable)
-- **Modifiers** (variants like size or flavor, with price adjustments)
-- **Out of stock** toggle (stays visible in the catalog but cannot be ordered)
-- Soft delete: the product leaves the catalog but does not disappear from past history
-
-Stores can browse and search the catalog but cannot create or edit products.
-
-### 3.4 Invoices
-Generated **automatically** when an order is fulfilled. Characteristics:
-
-- **Immutable** — once issued, they cannot be edited (fiscal/accounting requirement)
-- Sequential numbering (format `INV-YYYY-0001`)
-- Contains store and commissary data, line items, subtotal, configurable
-  tax (HST), total, and marketing royalties if configured
-- Filterable by period, store and number
-- Can be exported as PDF
-
-### 3.5 Audits
-The network's quality program:
-
-1. **Admin creates a template** — a list of questions grouped by category,
-   each with a rating scale (e.g. *Poor / Satisfactory / Good*).
-2. **Commissary visits the store** and fills out the audit on phone or
-   computer, optionally attaching **photo evidence** (up to 3 per item,
-   JPEG/PNG/WebP, max 2MB).
-3. **The system computes the score** automatically.
-4. **The store sees** the result of its own audits in the history.
-5. **Administration sees** the consolidated ranking on the dashboard.
-
-Reports can be exported as PDF.
-
-### 3.6 Users
-Admin manages:
-
-- Creating a new user (as admin, commissary or store — and linked to a specific store when applicable)
-- Editing data and role
-- **Deactivating**: access is revoked immediately, but history (orders, audits) is preserved
-- **Deleting**: only recommended for users who never operated; the system
-  blocks deletion when there are important dependencies
-
-### 3.7 Settings
-Admin-only. Defines:
-
-- Company details (legal name, tax ID, address) — used on invoices
-- **Tax rate (HST %)** — applied automatically on every new invoice
-- **Marketing royalties fee (%)**
-- Billing details for each store
-
-Any user (regardless of role) can change their own **password** and
-**email** from their profile page.
+### Dashboard
+- Orders by status, order value over time, store ranking (audit averages), top products.
+- Filters: period (7 days, 30 days, 3 months, 6 months) and store.
 
 ---
 
-## 4. How to access the system
+## 3. How to access the system
 
-1. Open **[https://app.scottybonsgrill.com](https://app.scottybonsgrill.com)**.
-2. Login screen: email + password.
-3. Forgot your password: click **"Forgot my password"** → a reset link arrives by email.
-4. Change password: log in → user menu → **Settings**.
-
-> **Tip:** the system works on phones, tablets and computers. Orders and
-> audits can be done from a phone, no app needed — just open the browser.
+- URL: **[https://app.scottybonsgrill.com](https://app.scottybonsgrill.com)**
+- Login: email + password. Forgot password → use the link on the login page; the reset email arrives within a few minutes (check spam if it doesn't).
+- An **admin can also set a user's password directly** from *Users → edit*, useful for onboarding someone who can't receive email yet or for resetting access for a user who is stuck.
+- Works on phone, tablet and computer. No app to install — just the browser.
 
 ---
 
-## 5. Accounts and services used by the system
+## 4. External services the system depends on
 
-Scotty-Ops relies on **four external services**. Each has a clear purpose
-and all of them are managed from a web dashboard:
+All four are registered under **info@scottybonsgrill.com**.
 
-| Service | Purpose | Dashboard | Plan |
-|---------|---------|-----------|------|
-| **GitHub** | Stores the source code | [github.com](https://github.com) | Free or Team |
-| **Supabase** | Database, login, files | [supabase.com/dashboard](https://supabase.com/dashboard) | Pro (~US$ 25/mo) |
-| **Vercel** | Hosts the website | [vercel.com/dashboard](https://vercel.com/dashboard) | Pro (~US$ 20/user/mo) |
-| **Resend** | Sends system emails | [resend.com](https://resend.com) | Free → Pro above 3,000 emails/mo |
+| Service | What it does | Current plan |
+|---------|--------------|--------------|
+| **GitHub** | Stores the source code | Free |
+| **Supabase** | Database, login, files. Daily backups for 7 days included | **Pro — ~US$ 25 / month** (paid) |
+| **Vercel** | Hosts the website | Free (Hobby) |
+| **Resend** | Sends system emails | Free |
 
-> All four accounts are registered under **info@scottybonsgrill.com**. Use this email to log in to each service dashboard.
-
-### Important recommendations
-- **Enable 2FA** (two-factor authentication) on all four accounts.
-- Keep every password in a **password manager** (1Password, Bitwarden). **Never** send credentials over WhatsApp or email.
+> **Resend daily limit:** the free plan caps email sending at **100 emails per day**. If the network grows or volume spikes (lots of order status changes + audit notifications), emails above the cap that day will be **rejected**. Upgrade to Resend Pro when you start approaching the limit (Resend dashboard shows daily usage in *Logs*).
 
 ---
 
-## 6. Day-to-day maintenance (no developer required)
+## 5. What admins can do without calling the developer
 
-Everything in this list is done **by the admin, directly inside the system**:
+Everything below is done directly inside the system:
 
-| What you need to do | Where to do it |
-|---------------------|----------------|
-| Create a new team member | Users → **New user** |
-| Revoke access for someone who left | Users → edit → **Deactivate** |
-| Reset someone's password | Users → edit → send reset link (or ask the person to use "Forgot my password") |
-| Add/remove a product from the catalog | Products → New / edit / delete |
-| Mark a product as out of stock | Product → **In stock** toggle |
-| Upload a new product image | Product → images tab |
-| Create a new product category | Products → Categories |
-| Adjust tax (HST) or royalties | Settings → Financial |
-| Update company data on invoices | Settings → Company |
-| Create a new audit template | Audits → Templates → New |
-| Look up an old invoice | Invoices → filter by period / store |
-| Export orders or audits as PDF | Inside the page, **Export** button |
+| Need | Where |
+|------|-------|
+| Add / remove a team member | Users → New user / Deactivate |
+| Reset someone's password | Users → edit → send reset link **or set a new password directly** |
+| Add or edit a product, upload images, manage categories | Products |
+| Mark a product out of stock or set a stock quantity | Product → toggle / stock field |
+| Create or duplicate an audit template | Audits → Templates |
+| Change tax (HST), royalties or company data on invoices | Settings |
+| Look up an old order or invoice, export as PDF | Orders / Invoices → filters → Export |
 
-### Recommended routines
-- **Weekly:** review unfulfilled orders and pending audits
-- **Monthly:** export the month's order and invoice reports
-- **Quarterly:** review the list of active users, deactivate those who left
-- **Yearly:** review the HST rate and tax data in *Settings*
+**Suggested routines:**
+- **Weekly:** review unfulfilled orders and pending audits.
+- **Monthly:** export the order / invoice report for the period.
+- **Quarterly:** review active users and deactivate those who left.
+- **Yearly:** review the HST rate and the company info in Settings.
 
 ---
 
-## 7. Backup, security and privacy
+## 6. When something goes wrong
 
-- **Database backup:** included with the **Supabase Pro** plan (daily, retained for 7 days). Nothing manual is required.
-- **Immutable history:** invoices and order history cannot be wiped by accident — only admins can delete orders, and the action is logged.
-- **Passwords:** stored encrypted by Supabase Auth itself. Not even the developer has access to user passwords.
-- **Data access:** each role sees only what it needs — this is not a "website rule", it's a **database rule** (technically: Row-Level Security).
-- **HTTPS everywhere:** all traffic between browser and server is encrypted.
-- **Banned users** are blocked immediately, even with an open session.
+- **A user cannot log in** → check they are *Active* under Users; ask them to use *Forgot my password*; check the reset email isn't in spam.
+- **An email is not arriving** → open the Resend dashboard ([resend.com](https://resend.com), email *Logs*). It shows whether the email was sent, delivered or rejected, and why.
+- **The site is down** → check [vercel.com/status](https://vercel.com/status) and [status.supabase.com](https://status.supabase.com). If those are green, contact the developer.
+- **Something looks wrong in an order or invoice** → open the order's history first; every change is logged with who did it and when.
 
 ---
 
-## 8. What to do if something goes wrong
+## 7. Security and data
 
-### A user cannot log in
-1. Confirm with the admin that the user is **active** under *Users*.
-2. Ask the user to use **"Forgot my password"**.
-3. Check if the reset email ended up in the spam folder.
-
-### System emails are not arriving
-1. Check the **Resend** dashboard (login.resend.com) → *Emails* — it shows whether the email was sent, delivered or rejected.
-2. If it's a domain-based rejection, notify the technical contact.
-
-### The site is down
-1. Open **vercel.com** → the project shows the status of the latest deploy.
-2. If there's an error, open a ticket with the developer (see the next section).
-
-### Suspicion of incorrect data
-- Every order, invoice and audit has a **traceable history** inside the system. Before contacting support, check the history of the affected order/invoice.
+- Each role only sees what it should — enforced by the **database itself**, not only the website.
+- Invoices and order history are **immutable**: they cannot be wiped by mistake.
+- Passwords are stored encrypted. Not even the developer has access to user passwords.
+- All traffic is over HTTPS.
+- Database is backed up automatically every day (kept for 7 days) by Supabase.
 
 ---
 
-## 9. For the future technical team
+## 8. For the next developer
 
-> This section is written for the **next developer** taking over maintenance
-> or evolution of Scotty-Ops. Feel free to skip if you are just using the
-> system.
+Quick orientation only — the codebase and `_bmad-output/implementation-artifacts/` carry the full design rationale per feature.
 
-### 9.1 Tech stack
+**Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind + shadcn/ui · Supabase (Postgres + Auth + Storage + Realtime) · Resend · jspdf · Vercel.
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | **Next.js 16** (App Router) + **React 19** |
-| Language | TypeScript 5.9 |
-| Styling | Tailwind CSS 3 + **shadcn/ui** + Radix UI |
-| Database | **Supabase (PostgreSQL)** + Row-Level Security |
-| Auth | Supabase Auth via `@supabase/ssr` (cookies) |
-| Storage | Supabase Storage (audit evidence) |
-| Realtime | Supabase Realtime (live order updates) |
-| Email | **Resend** |
-| PDF | `jspdf` + `jspdf-autotable` |
-| Excel | `xlsx` |
-| Validation | `zod` + `react-hook-form` |
-| Charts | `recharts` |
-| Hosting | **Vercel** (Edge Runtime) |
-
-### 9.2 Folder structure
+**Repo:**
 ```
-app/
-  (auth)/          Public routes: login, forgot-password, update-password
-  (dashboard)/     Authenticated routes (proxy.ts redirects by role)
-    dashboard/     KPIs and charts
-    orders/        Orders (list, detail, new)
-    products/      Catalog and categories
-    invoices/      Invoices
-    audits/        Audits + templates
-    users/         User management (admin)
-    settings/      Company settings
-    documentation/ This handover guide (admin)
-components/        Feature-grouped React components
-lib/
-  supabase/        Client init, auth helpers
-  email/           Resend helpers
-  validations/     Zod schemas
-supabase/
-  migrations/      ~45 migrations (full schema history)
-  config.toml
-docs/              This document and related guides
-_bmad-output/      Sprint stories and tech specs (what was built and why)
+app/(auth)         login, forgot-password, update-password
+app/(dashboard)    authenticated routes — proxy.ts gates by role
+components/        feature-grouped React
+lib/               supabase clients, email helpers, zod schemas, types
+supabase/migrations/   full schema history (apply with: supabase db push)
+docs/              this document
+_bmad-output/      sprint stories + tech specs — read these before redesigning anything
 ```
 
-### 9.3 Running locally
-
-```bash
-git clone <repo>
-cd scotty-ops
-cp .env.example .env.local   # fill in Supabase and Resend keys
-npm install
-npm run dev                  # serves http://localhost:3000
+**Environment variables:**
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY     # was ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY                # server-only, bypasses RLS
+NEXT_PUBLIC_APP_URL                      # used in email links
+RESEND_API_KEY                           # leave empty to disable email
+RESEND_FROM_EMAIL
 ```
 
-Required environment variables:
+**Things that will surprise you:**
+- The middleware file is `proxy.ts` (Next.js 16 naming). Do **not** create `middleware.ts` — they conflict. Session refresh, role-based redirects and inactive-user blocking live there.
+- **RLS is the real security layer.** Role checks in Server Actions are defense-in-depth. Never disable RLS on a table to "fix" something — fix the policy.
+- **Soft delete is the default** for products and orders. Most list queries must filter out deleted rows.
+- **Invoices are immutable** — there is no edit path, by design.
+- Stock and invoice numbering both use row locks to stay correct under concurrent requests.
+- UI strings are **English only** (overrides any PT-BR in older specs).
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (formerly `ANON_KEY`)
-- `SUPABASE_SERVICE_ROLE_KEY` (admin operations, **never** exposed to the client)
-- `RESEND_API_KEY`
-- `RESEND_FROM_EMAIL`
-
-### 9.4 Database
-
-- Every schema change is tracked as a **SQL migration** in `supabase/migrations/`.
-- To apply the full schema to a fresh Supabase project:
-  ```bash
-  supabase link --project-ref <ref>
-  supabase db push
-  ```
-- Main tables: `stores`, `profiles`, `products`, `product_categories`,
-  `product_images`, `product_modifiers`, `orders`, `order_items`,
-  `order_status_history`, `invoices`, `invoice_items`, `audit_templates`,
-  `audit_template_items`, `audits`, `audit_responses`, `audit_evidence`,
-  `financial_settings`.
-- **RLS policies** and `SECURITY DEFINER` functions are part of the
-  security model — **never disable RLS** on a table to "fix things quickly".
-- Invoice numbering uses a **Postgres advisory lock** to prevent
-  duplicates under concurrency.
-
-### 9.5 Deployment
-
-- **Automatic** on push to `master`, via the Vercel ↔ GitHub integration.
-- Preview deploys are created for every PR.
-- Environment variables live under *Vercel → Project → Settings → Environment Variables*.
-
-### 9.6 Project-specific caveats
-
-- **`proxy.ts`** (not `middleware.ts`) handles session (Supabase cookies), role-based redirects
-  and banned-user blocking. If anything fails during login, start there.
-- **Soft delete** is the default for products and orders — be careful
-  writing queries without `is_deleted = false`.
-- **Images** live in a Supabase Storage bucket and are served via signed URLs.
-- The full history of specs behind every feature (including design
-  rationale) is in `_bmad-output/implementation-artifacts/`.
-
-### 9.7 Code conventions
-
-- Server Actions (`actions.ts`) validate the user's role **before** any
-  mutation — do not remove those checks.
-- Forms use `react-hook-form` + `zod` — schemas live in `lib/validations`.
-- Language: the **UI is in English** (product decision); documentation and
-  client-facing content can be in Portuguese or English.
+**Deploy:**
+- Push to `master` → Vercel deploys production automatically.
+- Each PR gets a preview deploy.
+- Env vars: Vercel → Project → Settings → Environment Variables.
+- DB changes: add a new migration file in `supabase/migrations/`, then `supabase db push`.
 
 ---
 
-## 10. Final deliverables
+## 9. Support
 
-- [x] Full source code in the Scotty Bons GitHub repository
-- [x] Supabase database provisioned in the Scotty Bons account (info@scottybonsgrill.com), with production data
-- [x] Vercel production deploy in the Scotty Bons account (info@scottybonsgrill.com)
-- [x] Application domain configured — https://app.scottybonsgrill.com
-- [x] Resend transactional emails active in the Scotty Bons account (info@scottybonsgrill.com)
-- [x] Initial admin user created
-- [x] Initial product catalog loaded
-- [x] Baseline audit template created
-- [x] This handover document
+| Topic | Contact |
+|-------|---------|
+| Day-to-day usage | Scotty Bons admin |
+| Bugs / new features / code changes | **Gustavo** — gustavo@equipepadoque.com.br · +55 31 97338-6815 |
+| Infrastructure status | [vercel.com/status](https://vercel.com/status) · [status.supabase.com](https://status.supabase.com) · [resend.com/status](https://resend.com/status) |
 
----
-
-## 11. Support and contacts
-
-| Purpose | Contact |
-|---------|---------|
-| Usage questions (admin/store) | Scotty Bons administrator |
-| Evolutive maintenance / bugs | **Gustavo** — gustavo@equipepadoque.com.br · +55 31 97338-6815 |
-| Infra status (site is down) | [vercel.com/status](https://vercel.com/status) · [status.supabase.com](https://status.supabase.com) · [resend.com/status](https://resend.com/status) |
-
-> **Last updated:** 2026-05-13.
+_Last updated: 2026-05-18._

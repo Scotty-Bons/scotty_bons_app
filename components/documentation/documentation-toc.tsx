@@ -40,8 +40,6 @@ export function DocumentationToc({ headings }: Props) {
     return () => observerRef.current?.disconnect();
   }, [headings]);
 
-  const h2Headings = headings.filter((h) => h.level === 2);
-
   return (
     <nav className="hidden lg:flex lg:flex-col w-56 shrink-0 sticky top-6 self-start max-h-[calc(100vh-6rem)] overflow-y-auto">
       <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -79,14 +77,6 @@ export function DocumentationToc({ headings }: Props) {
             );
           })}
       </ul>
-
-      {h2Headings.length > 0 && (
-        <div className="mt-6 pt-4 border-t border-border">
-          <p className="text-xs text-muted-foreground">
-            {h2Headings.length} sections
-          </p>
-        </div>
-      )}
     </nav>
   );
 }
